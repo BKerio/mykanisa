@@ -1,0 +1,2218 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:pcea_church/config/server.dart';
+import 'package:pcea_church/method/api.dart';
+import 'package:pcea_church/screen/login.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+
+class Register extends StatefulWidget {
+  const Register({super.key});
+
+  @override
+  State<Register> createState() => _RegisterState();
+}
+
+class _RegisterState extends State<Register> {
+  final _formKey = GlobalKey<FormState>();
+  final primaryColor = const Color(0xFF0A1F44);
+  final darkBlue = const Color(0xFF0A1F44);
+
+  // Step management
+  int currentStep = 0;
+  final PageController _pageController = PageController();
+  final int totalSteps = 4;
+
+  // Controllers
+  final fullName = TextEditingController();
+  final dob = TextEditingController();
+  final nationalId = TextEditingController();
+  final email = TextEditingController();
+  final telephone = TextEditingController();
+  final district = TextEditingController();
+  final congregation = TextEditingController();
+  final password = TextEditingController();
+  final passwordConfirm = TextEditingController();
+
+  // State variables
+  int? age;
+  String gender = 'Male';
+  String maritalStatus = 'Single';
+  bool isBaptized = false;
+  bool takesHolyCommunion = false;
+  bool hasDependents = false;
+  bool isLoading = false;
+  bool _obscurePassword = true;
+
+  // Location data
+  String selectedRegionId = '';
+  String selectedRegionName = '';
+  String selectedPresbyteryId = '';
+  String selectedPresbyteryName = '';
+  String selectedParishId = '';
+  String selectedParishName = '';
+
+  List<Map<String, dynamic>> regions = [];
+  List<Map<String, dynamic>> presbyteries = [];
+  List<Map<String, dynamic>> parishes = [];
+  List<Map<String, dynamic>> groups = [];
+  final Set<int> selectedGroupIds = {};
+  bool isLoadingRegions = true;
+  bool isLoadingPresbyteries = false;
+  bool isLoadingParishes = false;
+
+  // Dependents
+  final List<Map<String, dynamic>> dependents = [];
+  static const int _minYear = 1900;
+  int get _currentYear => DateTime.now().year;
+
+  // Profile image
+  XFile? profileImage;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  // Section save states
+  Map<String, bool> sectionSaved = {
+    'personal': false,
+    'church': false,
+    'dependents': false,
+    'security': false,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    loadRegions();
+    loadGroups();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> loadRegions() async {
+    try {
+      final res = await API().getRequest(
+        url: Uri.parse('${Config.baseUrl}/regions'),
+      );
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body['status'] == 200) {
+          setState(() {
+            regions = List<Map<String, dynamic>>.from(body['regions']);
+            isLoadingRegions = false;
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        isLoadingRegions = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to load regions. Please check your connection.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> loadGroups() async {
+    try {
+      final res = await API().getRequest(
+        url: Uri.parse('${Config.baseUrl}/groups'),
+      );
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body['status'] == 200) {
+          setState(() {
+            groups = List<Map<String, dynamic>>.from(body['groups']);
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> loadPresbyteries(String regionId) async {
+    try {
+      setState(() {
+        isLoadingPresbyteries = true;
+        presbyteries = [];
+      });
+
+      final url = Uri.parse(
+        '${Config.baseUrl}/presbyteries?region_id=$regionId',
+      );
+      final res = await API().getRequest(url: url);
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body['status'] == 200 && body['presbyteries'] != null) {
+          setState(() {
+            presbyteries = List<Map<String, dynamic>>.from(
+              body['presbyteries'],
+            );
+            selectedPresbyteryId = '';
+            selectedPresbyteryName = '';
+            parishes = [];
+            selectedParishId = '';
+            selectedParishName = '';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading presbyteries: $e');
+      setState(() {
+        presbyteries = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingPresbyteries = false;
+        });
+      }
+    }
+  }
+
+  Future<void> loadParishes(String presbyteryId) async {
+    try {
+      setState(() {
+        isLoadingParishes = true;
+        parishes = [];
+      });
+
+      final url = Uri.parse(
+        '${Config.baseUrl}/parishes?presbytery_id=$presbyteryId',
+      );
+      final res = await API().getRequest(url: url);
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body['status'] == 200 && body['parishes'] != null) {
+          setState(() {
+            parishes = List<Map<String, dynamic>>.from(body['parishes']);
+            selectedParishId = '';
+            selectedParishName = '';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading parishes: $e');
+      setState(() {
+        parishes = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingParishes = false;
+        });
+      }
+    }
+  }
+
+  void addDependent() {
+    if (dependents.length >= 10) {
+      _toast('Maximum 10 dependents allowed');
+      return;
+    }
+    setState(() {
+      dependents.add({
+        'name': TextEditingController(),
+        'year_of_birth': TextEditingController(text: _currentYear.toString()),
+        'birth_cert': TextEditingController(),
+        'is_baptized': false,
+        'takes_holy_communion': false,
+        'school': TextEditingController(),
+      });
+    });
+  }
+
+  void removeDependent(int index) {
+    setState(() {
+      dependents.removeAt(index);
+    });
+  }
+
+  void pickDependentDob(int index) async {
+    if (index < 0 || index >= dependents.length) return;
+    final now = DateTime.now();
+    final first = DateTime(now.year - 100, 1, 1);
+    final last = now;
+    final controller =
+        dependents[index]['year_of_birth'] as TextEditingController;
+    final initial = () {
+      final existing = DateTime.tryParse(controller.text.trim());
+      if (existing != null) return existing;
+      return DateTime(now.year - 5, now.month, now.day);
+    }();
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
+    );
+    if (picked != null) {
+      final dobStr =
+          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      setState(() => controller.text = dobStr);
+    }
+  }
+
+  void pickDob() async {
+    final now = DateTime.now();
+    final first = DateTime(now.year - 100, 1, 1);
+    final last = now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year - 18, now.month, now.day),
+      firstDate: first,
+      lastDate: last,
+    );
+    if (picked != null) {
+      dob.text =
+          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      final calculatedAge = _calculateAge(picked);
+      setState(() => age = calculatedAge);
+    }
+  }
+
+  int _calculateAge(DateTime birthDate) {
+    final today = DateTime.now();
+    int years = today.year - birthDate.year;
+    if (today.month < birthDate.month ||
+        (today.month == birthDate.month && today.day < birthDate.day)) {
+      years--;
+    }
+    return years;
+  }
+
+  Future<void> _pickProfileImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      if (pickedFile != null) {
+        setState(() {
+          profileImage = pickedFile;
+        });
+      }
+    } catch (e) {
+      _toast('Failed to pick image: $e');
+    }
+  }
+
+  bool validateCurrentStep() {
+    switch (currentStep) {
+      case 0: // Personal Info
+        return fullName.text.isNotEmpty &&
+            email.text.isNotEmpty &&
+            dob.text.isNotEmpty;
+      case 1: // Church Details
+        return selectedRegionId.isNotEmpty &&
+            selectedPresbyteryId.isNotEmpty &&
+            selectedParishId.isNotEmpty &&
+            congregation.text.isNotEmpty &&
+            district.text.isNotEmpty;
+      case 2: // Dependents (optional)
+        return true;
+      case 3: // Security
+        return password.text.isNotEmpty &&
+            passwordConfirm.text.isNotEmpty &&
+            password.text == passwordConfirm.text &&
+            password.text.length >= 6;
+      default:
+        return false;
+    }
+  }
+
+  Future<void> saveCurrentSection() async {
+    if (!validateCurrentStep()) {
+      _toast('Please complete all required fields');
+      return;
+    }
+
+    setState(() {
+      sectionSaved[_getSectionKey(currentStep)] = true;
+    });
+
+    _toast('Section saved successfully!');
+  }
+
+  String _getSectionKey(int step) {
+    switch (step) {
+      case 0:
+        return 'personal';
+      case 1:
+        return 'church';
+      case 2:
+        return 'dependents';
+      case 3:
+        return 'security';
+      default:
+        return '';
+    }
+  }
+
+  void nextStep() {
+    if (currentStep < totalSteps - 1) {
+      if (validateCurrentStep()) {
+        setState(() {
+          currentStep++;
+        });
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      } else {
+        _toast('Please complete all required fields');
+      }
+    }
+  }
+
+  void previousStep() {
+    if (currentStep > 0) {
+      setState(() {
+        currentStep--;
+      });
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  Future<void> submit() async {
+    if (isLoading) return;
+    if (!_formKey.currentState!.validate()) return;
+
+    // Validate all sections
+    for (int i = 0; i < totalSteps; i++) {
+      if (i == 2) continue; // Dependents are optional
+      if (!validateCurrentStep()) {
+        _toast('Please complete all sections');
+        setState(() {
+          currentStep = i;
+        });
+        _pageController.animateToPage(
+          i,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        return;
+      }
+    }
+
+    // Conditional national ID requirement
+    final parsedDob = DateTime.tryParse(dob.text);
+    final computedAge = parsedDob != null ? _calculateAge(parsedDob) : null;
+    if ((computedAge ?? 0) >= 18 && (nationalId.text.trim().isEmpty)) {
+      _toast('National Id is required for members 18 years and above');
+      return;
+    }
+
+    final deps = hasDependents
+        ? dependents
+              .map((d) {
+                final name = (d['name'] as TextEditingController).text.trim();
+                final raw = (d['year_of_birth'] as TextEditingController).text
+                    .trim();
+                int? y;
+                final asDate = DateTime.tryParse(raw);
+                if (asDate != null) {
+                  y = asDate.year;
+                } else {
+                  y = int.tryParse(raw);
+                }
+                final birthCert = (d['birth_cert'] as TextEditingController?)
+                    ?.text
+                    .trim();
+                return {
+                  'name': name,
+                  'year_of_birth': y ?? 0,
+                  'birth_cert_number':
+                      (birthCert != null && birthCert.isNotEmpty)
+                      ? birthCert
+                      : null,
+                  'is_baptized': d['is_baptized'] as bool,
+                  'takes_holy_communion': d['takes_holy_communion'] as bool,
+                  'school': (d['school'] as TextEditingController).text.trim(),
+                };
+              })
+              .where(
+                (e) =>
+                    e['name'] != '' &&
+                    (e['year_of_birth'] as int) >= _minYear &&
+                    (e['year_of_birth'] as int) <= _currentYear,
+              )
+              .toList()
+        : <Map<String, dynamic>>[];
+
+    try {
+      setState(() => isLoading = true);
+
+      http.Response res;
+
+      // Use multipart if profile image is provided
+      if (profileImage != null) {
+        final fields = {
+          'full_name': fullName.text.trim(),
+          'date_of_birth': dob.text.trim(),
+          'national_id': nationalId.text.trim(),
+          'email': email.text.trim(),
+          'gender': gender,
+          'marital_status': maritalStatus,
+          'is_baptized': isBaptized.toString(),
+          'takes_holy_communion': takesHolyCommunion.toString(),
+          'telephone': telephone.text.trim(),
+          'region': selectedRegionName,
+          'presbytery': selectedPresbyteryName,
+          'parish': selectedParishName,
+          'district': district.text.trim(),
+          'congregation': congregation.text.trim(),
+          'dependencies': jsonEncode(deps),
+          'group_ids': jsonEncode(selectedGroupIds.toList()),
+          'password': password.text,
+          'password_confirmation': passwordConfirm.text,
+        };
+
+        final streamedResponse = await API().uploadMultipart(
+          url: Uri.parse('${Config.baseUrl}/members/register'),
+          fields: fields,
+          fileField: 'profile_image',
+          filePath: profileImage!.path,
+          requireAuth: false,
+        );
+
+        res = await http.Response.fromStream(streamedResponse);
+      } else {
+        // Use regular JSON post if no image
+        final payload = {
+          'full_name': fullName.text.trim(),
+          'date_of_birth': dob.text.trim(),
+          'national_id': nationalId.text.trim(),
+          'email': email.text.trim(),
+          'gender': gender,
+          'marital_status': maritalStatus,
+          'is_baptized': isBaptized,
+          'takes_holy_communion': takesHolyCommunion,
+          'telephone': telephone.text.trim(),
+          'region': selectedRegionName,
+          'presbytery': selectedPresbyteryName,
+          'parish': selectedParishName,
+          'district': district.text.trim(),
+          'congregation': congregation.text.trim(),
+          'dependencies': deps,
+          'group_ids': selectedGroupIds.toList(),
+          'password': password.text,
+          'password_confirmation': passwordConfirm.text,
+        };
+
+        res = await API().postRequest(
+          url: Uri.parse('${Config.baseUrl}/members/register'),
+          data: payload,
+        );
+      }
+
+      final resp = jsonDecode(res.body);
+      if (resp['status'] == 200) {
+        // Save e-kanisa number and profile image to SharedPreferences
+        if (resp['member'] != null) {
+          SharedPreferences preferences = await SharedPreferences.getInstance();
+          if (resp['member']['e_kanisa_number'] != null) {
+            await preferences.setString(
+              'e_kanisa_number',
+              resp['member']['e_kanisa_number'],
+            );
+          }
+          // Save profile image URL if available
+          if (resp['member']['profile_image_url'] != null) {
+            await preferences.setString(
+              'profile_image_url',
+              resp['member']['profile_image_url'],
+            );
+          }
+        }
+        API.showSnack(
+          context,
+          'Member Registered Successfully! Welcome to Our Church Community.',
+          success: true,
+        );
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const Login()),
+        );
+      } else {
+        API.showSnack(
+          context,
+          resp['message']?.toString() ?? 'Registration failed',
+          success: false,
+        );
+      }
+    } catch (e) {
+      API.showSnack(context, 'Something went wrong', success: false);
+    }
+    setState(() => isLoading = false);
+  }
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // Helper method to create input fields with login styling
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+    VoidCallback? onTap,
+    Widget? suffixIcon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        onTap: onTap,
+        decoration: InputDecoration(
+          hintText: hintText,
+          border: InputBorder.none,
+          prefixIcon: Icon(icon, color: Colors.grey, size: 20),
+          suffixIcon: suffixIcon,
+        ),
+      ),
+    );
+  }
+
+  // Helper method to create dropdown fields
+
+  Widget _buildStepIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(totalSteps, (index) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: index <= currentStep ? primaryColor : Colors.grey.shade300,
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildPersonalInfoStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Personal Information",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: darkBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Tell us about yourself",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+        const SizedBox(height: 24),
+
+        // Profile Image Upload
+        Center(
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: _pickProfileImage,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey.shade200,
+                    border: Border.all(color: primaryColor, width: 2),
+                  ),
+                  child: profileImage != null
+                      ? ClipOval(
+                          child: Image.file(
+                            File(profileImage!.path),
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.camera_alt,
+                              color: primaryColor,
+                              size: 30,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Add Photo',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: primaryColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                profileImage != null
+                    ? 'Tap to change photo'
+                    : 'Upload your profile photo (Optional)',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        _buildInputField(
+          controller: fullName,
+          hintText: "Enter full member name",
+          icon: Icons.person,
+          validator: (value) => (value == null || value.isEmpty)
+              ? 'Please enter full name'
+              : null,
+        ),
+        const SizedBox(height: 16),
+
+        _buildInputField(
+          controller: dob,
+          hintText: dob.text.isEmpty ? 'Date of Birth' : dob.text,
+          icon: Icons.calendar_month_outlined,
+          onTap: pickDob,
+          suffixIcon: age != null
+              ? Text('Age: $age', style: const TextStyle(color: Colors.grey))
+              : null,
+        ),
+        const SizedBox(height: 16),
+
+        _buildInputField(
+          controller: nationalId,
+          hintText: "National ID Number (Optional) for under 18s",
+          icon: Icons.card_membership_rounded,
+          keyboardType: TextInputType.text,
+        ),
+        const SizedBox(height: 16),
+
+        _buildInputField(
+          controller: email,
+          hintText: "Enter your email address",
+          icon: Icons.email,
+          keyboardType: TextInputType.emailAddress,
+          validator: (value) => (value == null || value.isEmpty)
+              ? 'Please enter your email'
+              : null,
+        ),
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: _openGenderPicker,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(_genderIcon(gender), color: Colors.grey),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Gender',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              gender,
+                              style: const TextStyle(fontSize: 16),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: GestureDetector(
+                onTap: _openMaritalStatusPicker,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.favorite_outline, color: Colors.grey),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Marital Status',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Icon(
+                                  _maritalIcon(maritalStatus),
+                                  size: 18,
+                                  color: Colors.black54,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    maritalStatus.isEmpty
+                                        ? 'Select status'
+                                        : maritalStatus,
+                                    style: const TextStyle(fontSize: 16),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.search, color: Colors.grey),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: CheckboxListTile(
+                value: isBaptized,
+                onChanged: (v) => setState(() => isBaptized = v ?? false),
+                title: const Text('Baptized', style: TextStyle(fontSize: 14)),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            Expanded(
+              child: CheckboxListTile(
+                value: takesHolyCommunion,
+                onChanged: (v) =>
+                    setState(() => takesHolyCommunion = v ?? false),
+                title: const Text(
+                  'Holy Communion',
+                  style: TextStyle(fontSize: 14),
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        _buildInputField(
+          controller: telephone,
+          hintText: "Enter phone number (0712345678)",
+          icon: Icons.phone_android_rounded,
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: 16),
+
+        // Groups Selection (moved from Church Details)
+        if (groups.isNotEmpty)
+          InkWell(
+            onTap: _openGroupsDialog,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.group,
+                    color: selectedGroupIds.isEmpty
+                        ? Colors.grey
+                        : Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              "Select church groups (optional)",
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(width: 8),
+                            if (selectedGroupIds.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  '${selectedGroupIds.length} selected',
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        if (selectedGroupIds.isEmpty)
+                          const Text(
+                            'None selected',
+                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          )
+                        else
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: groups
+                                .where(
+                                  (g) => selectedGroupIds.contains(
+                                    (g['id'] as num).toInt(),
+                                  ),
+                                )
+                                .map(
+                                  (g) => Chip(
+                                    label: Text(
+                                      g['name']?.toString() ?? '',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withOpacity(0.08),
+                                    shape: StadiumBorder(
+                                      side: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary.withOpacity(0.35),
+                                      ),
+                                    ),
+                                    labelStyle: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildChurchDetailsStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Church Location",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: darkBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Select your church details",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+        const SizedBox(height: 24),
+
+        // Region (Searchable Picker)
+        GestureDetector(
+          onTap: isLoadingRegions ? null : _openRegionPicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.map, color: Colors.grey),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isLoadingRegions ? 'Loading regions...' : 'Region',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        selectedRegionName.isEmpty
+                            ? (isLoadingRegions
+                                  ? 'Please wait'
+                                  : 'Select Region (searchable)')
+                            : selectedRegionName,
+                        style: const TextStyle(fontSize: 16),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.search, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Presbytery (Searchable Picker)
+        GestureDetector(
+          onTap: (selectedRegionId.isEmpty || isLoadingPresbyteries)
+              ? null
+              : _openPresbyteryPicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.apartment, color: Colors.grey),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isLoadingPresbyteries
+                            ? 'Loading presbyteries...'
+                            : presbyteries.isEmpty
+                            ? 'Select a region first'
+                            : 'Presbytery',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        selectedPresbyteryName.isEmpty
+                            ? ((selectedRegionId.isEmpty ||
+                                      isLoadingPresbyteries)
+                                  ? 'Select a region first'
+                                  : 'Select Presbytery (searchable)')
+                            : selectedPresbyteryName,
+                        style: const TextStyle(fontSize: 16),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.search, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Parish (Searchable Picker)
+        GestureDetector(
+          onTap: (selectedPresbyteryId.isEmpty || isLoadingParishes)
+              ? null
+              : _openParishPicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.church_outlined, color: Colors.grey),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isLoadingParishes
+                            ? 'Loading parishes...'
+                            : parishes.isEmpty
+                            ? 'Select a presbytery first'
+                            : 'Parish',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        selectedParishName.isEmpty
+                            ? ((selectedPresbyteryId.isEmpty ||
+                                      isLoadingParishes)
+                                  ? 'Select a presbytery first'
+                                  : 'Select Parish (searchable)')
+                            : selectedParishName,
+                        style: const TextStyle(fontSize: 16),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.search, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        _buildInputField(
+          controller: congregation,
+          hintText: "Congregation (Church) Name",
+          icon: Icons.church,
+          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+        ),
+        const SizedBox(height: 16),
+
+        _buildInputField(
+          controller: district,
+          hintText: "District",
+          icon: Icons.location_on,
+          validator: (v) =>
+              (v == null || v.isEmpty) ? 'District is required' : null,
+        ),
+        // Note: Groups selection moved to Personal Information step
+      ],
+    );
+  }
+
+  Widget _buildDependentsStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Add your dependents (Optional)",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: darkBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Add information about your dependents",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+        const SizedBox(height: 24),
+
+        CheckboxListTile(
+          value: hasDependents,
+          onChanged: (v) => setState(() => hasDependents = v ?? false),
+          title: const Text(
+            'Do you have dependents to add?',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+        ),
+
+        if (hasDependents) ...[
+          const SizedBox(height: 16),
+          ...List.generate(dependents.length, (i) {
+            final d = dependents[i];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade300),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            height: 28,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.child_care,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Dependent ${i + 1}',
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            tooltip: 'Remove',
+                            onPressed: () => removeDependent(i),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: d['name'],
+                              decoration: const InputDecoration(
+                                labelText: 'Dependent Full Name *',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => pickDependentDob(i),
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'Year Of Birth *',
+                                  border: OutlineInputBorder(),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.event, color: Colors.grey),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        (d['year_of_birth']
+                                                    as TextEditingController)
+                                                .text
+                                                .isEmpty
+                                            ? 'Select DOB'
+                                            : (d['year_of_birth']
+                                                      as TextEditingController)
+                                                  .text,
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Birth Certificate Number
+                      TextFormField(
+                        controller: (d['birth_cert'] as TextEditingController),
+                        keyboardType: TextInputType.number,
+                        maxLength: 9,
+                        decoration: const InputDecoration(
+                          labelText:
+                              'Enter dependents Birth Certificate No(9 digits)',
+                          border: OutlineInputBorder(),
+                          counterText: '',
+                        ),
+                        validator: (v) {
+                          final t = (v ?? '').trim();
+                          if (t.isEmpty) return null; // optional
+                          if (t.length != 9 || int.tryParse(t) == null) {
+                            return 'Enter exactly 9 digits';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: CheckboxListTile(
+                              value: d['is_baptized'],
+                              onChanged: (v) =>
+                                  setState(() => d['is_baptized'] = v ?? false),
+                              title: const Text('Baptized'),
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                          ),
+                          Expanded(
+                            child: CheckboxListTile(
+                              value: d['takes_holy_communion'],
+                              onChanged: (v) => setState(
+                                () => d['takes_holy_communion'] = v ?? false,
+                              ),
+                              title: const Text('Holy Communion'),
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: d['school'],
+                        decoration: const InputDecoration(
+                          labelText: "School they've enrolled in (optional)",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: addDependent,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 1.5,
+                ),
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                overlayColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withOpacity(0.1),
+              ),
+              icon: const Icon(Icons.add_circle_outline, size: 22),
+              label: const Text(
+                'Add Dependent',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSecurityStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Account Security",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: darkBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Create a secure password for your account",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+        const SizedBox(height: 24),
+
+        _buildInputField(
+          controller: password,
+          hintText: "Create a strong password",
+          icon: Icons.lock_outlined,
+          obscureText: _obscurePassword,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility : Icons.visibility_off,
+              color: Colors.grey,
+            ),
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please create a strong password';
+            }
+            if (value.length < 6) {
+              return 'Password must be at least 6 characters';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        _buildInputField(
+          controller: passwordConfirm,
+          hintText: "Confirm your password",
+          icon: Icons.lock_outlined,
+          obscureText: _obscurePassword,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility : Icons.visibility_off,
+              color: Colors.grey,
+            ),
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please confirm your password';
+            }
+            if (value != password.text) {
+              return 'Passwords do not match';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  void _openGroupsDialog() {
+    final temp = Set<int>.from(selectedGroupIds);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            return AlertDialog(
+              title: const Text("Select church groups you're in"),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: groups.map((group) {
+                    final groupId = (group['id'] as num).toInt();
+                    final isSelected = temp.contains(groupId);
+                    return Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.08)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: CheckboxListTile(
+                        value: isSelected,
+                        dense: true,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: Theme.of(context).colorScheme.primary,
+                        checkColor: Colors.white,
+                        title: Text(
+                          group['name']?.toString() ?? '',
+                          style: TextStyle(
+                            fontWeight: isSelected ? FontWeight.w600 : null,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
+                          ),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        side: BorderSide(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.grey.shade400,
+                          width: 1.4,
+                        ),
+                        onChanged: (checked) {
+                          setLocal(() {
+                            if (checked == true) {
+                              temp.add(groupId);
+                            } else {
+                              temp.remove(groupId);
+                            }
+                          });
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      selectedGroupIds
+                        ..clear()
+                        ..addAll(temp);
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  IconData _maritalIcon(String value) {
+    switch (value) {
+      case 'Single':
+        return Icons.person_outline;
+      case 'Married (Customary)':
+      case 'Married (Church Wedding)':
+        return Icons.favorite_outline;
+      case 'Divorced':
+        return Icons.heart_broken_outlined;
+      case 'Widow':
+        return Icons.woman_outlined;
+      case 'Widower':
+        return Icons.man_outlined;
+      case 'Separated':
+        return Icons.remove_circle_outline;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  void _openMaritalStatusPicker() {
+    final options = <String>[
+      'Single',
+      'Married (Customary)',
+      'Married (Church Wedding)',
+      'Divorced',
+      'Widow',
+      'Widower',
+      'Separated',
+    ];
+    List<String> filtered = List<String>.from(options);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: StatefulBuilder(
+              builder: (context, setLocal) {
+                void applyFilter(String q) {
+                  final ql = q.toLowerCase();
+                  setLocal(() {
+                    filtered = options
+                        .where((s) => s.toLowerCase().contains(ql))
+                        .toList();
+                  });
+                }
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: 'Search marital status...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: applyFilter,
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final v = filtered[index];
+                          return ListTile(
+                            leading: Icon(_maritalIcon(v)),
+                            title: Text(v),
+                            trailing: v == maritalStatus
+                                ? const Icon(Icons.check, color: Colors.green)
+                                : null,
+                            onTap: () {
+                              setState(() => maritalStatus = v);
+                              Navigator.of(context).pop();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  IconData _genderIcon(String v) {
+    switch (v) {
+      case 'Male':
+        return Icons.male;
+      case 'Female':
+        return Icons.female;
+      default:
+        return Icons.person_outline;
+    }
+  }
+
+  void _openGenderPicker() {
+    final options = <String>['Male', 'Female'];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              const Text(
+                'Select gender',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ...options.map(
+                (v) => ListTile(
+                  leading: Icon(_genderIcon(v)),
+                  title: Text(v),
+                  trailing: v == gender
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : null,
+                  onTap: () {
+                    setState(() => gender = v);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openRegionPicker() {
+    List<Map<String, dynamic>> filtered = List<Map<String, dynamic>>.from(
+      regions,
+    );
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: StatefulBuilder(
+              builder: (context, setLocal) {
+                void applyFilter(String q) {
+                  final ql = q.toLowerCase();
+                  setLocal(() {
+                    filtered = regions
+                        .where(
+                          (r) => (r['name']?.toString() ?? '')
+                              .toLowerCase()
+                              .contains(ql),
+                        )
+                        .toList();
+                  });
+                }
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: 'Search region...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: applyFilter,
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final r = filtered[index];
+                          return ListTile(
+                            leading: const Icon(Icons.place_outlined),
+                            title: Text(r['name']?.toString() ?? ''),
+                            onTap: () {
+                              setState(() {
+                                selectedRegionId = r['id'].toString();
+                                selectedRegionName =
+                                    r['name']?.toString() ?? '';
+                                presbyteries = [];
+                                parishes = [];
+                                selectedPresbyteryId = '';
+                                selectedPresbyteryName = '';
+                                selectedParishId = '';
+                                selectedParishName = '';
+                              });
+                              Navigator.of(context).pop();
+                              loadPresbyteries(selectedRegionId);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openPresbyteryPicker() {
+    List<Map<String, dynamic>> filtered = List<Map<String, dynamic>>.from(
+      presbyteries,
+    );
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: StatefulBuilder(
+              builder: (context, setLocal) {
+                void applyFilter(String q) {
+                  final ql = q.toLowerCase();
+                  setLocal(() {
+                    filtered = presbyteries
+                        .where(
+                          (p) => (p['name']?.toString() ?? '')
+                              .toLowerCase()
+                              .contains(ql),
+                        )
+                        .toList();
+                  });
+                }
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: 'Search presbytery...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: applyFilter,
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final p = filtered[index];
+                          return ListTile(
+                            leading: const Icon(Icons.apartment_outlined),
+                            title: Text(p['name']?.toString() ?? ''),
+                            onTap: () {
+                              setState(() {
+                                selectedPresbyteryId = p['id'].toString();
+                                selectedPresbyteryName =
+                                    p['name']?.toString() ?? '';
+                                parishes = [];
+                                selectedParishId = '';
+                                selectedParishName = '';
+                              });
+                              Navigator.of(context).pop();
+                              loadParishes(selectedPresbyteryId);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openParishPicker() {
+    List<Map<String, dynamic>> filtered = List<Map<String, dynamic>>.from(
+      parishes,
+    );
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: StatefulBuilder(
+              builder: (context, setLocal) {
+                void applyFilter(String q) {
+                  final ql = q.toLowerCase();
+                  setLocal(() {
+                    filtered = parishes
+                        .where(
+                          (p) => (p['name']?.toString() ?? '')
+                              .toLowerCase()
+                              .contains(ql),
+                        )
+                        .toList();
+                  });
+                }
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: 'Search parish...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onChanged: applyFilter,
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final p = filtered[index];
+                          return ListTile(
+                            leading: const Icon(Icons.church),
+                            title: Text(p['name']?.toString() ?? ''),
+                            onTap: () {
+                              setState(() {
+                                selectedParishId = p['id'].toString();
+                                selectedParishName =
+                                    p['name']?.toString() ?? '';
+                              });
+                              Navigator.of(context).pop();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFE8F4FD),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  // Circular logo with shadow
+                  Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: ClipOval(
+                        child: Image.asset(
+                          "assets/icon.png",
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Member Registration",
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: darkBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildStepIndicator(),
+                ],
+              ),
+            ),
+
+            // Main Content
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      // Page View with scrollable content
+                      Expanded(
+                        child: PageView(
+                          controller: _pageController,
+                          onPageChanged: (index) {
+                            setState(() {
+                              currentStep = index;
+                            });
+                          },
+                          children: [
+                            SingleChildScrollView(
+                              padding: const EdgeInsets.all(24),
+                              child: _buildPersonalInfoStep(),
+                            ),
+                            SingleChildScrollView(
+                              padding: const EdgeInsets.all(24),
+                              child: _buildChurchDetailsStep(),
+                            ),
+                            SingleChildScrollView(
+                              padding: const EdgeInsets.all(24),
+                              child: _buildDependentsStep(),
+                            ),
+                            SingleChildScrollView(
+                              padding: const EdgeInsets.all(24),
+                              child: _buildSecurityStep(),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Fixed bottom section with navigation buttons
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(20),
+                            topRight: Radius.circular(20),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 10,
+                              offset: Offset(0, -2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Navigation Buttons
+                            Row(
+                              children: [
+                                if (currentStep > 0)
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: previousStep,
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text('Previous'),
+                                    ),
+                                  ),
+                                if (currentStep > 0) const SizedBox(width: 16),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: currentStep == totalSteps - 1
+                                        ? (isLoading ? null : submit)
+                                        : nextStep,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryColor,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: isLoading
+                                        ? const CircularProgressIndicator(
+                                            color: Colors.green,
+                                          )
+                                        : Text(
+                                            currentStep == totalSteps - 1
+                                                ? 'Complete Registration'
+                                                : 'Next',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Save Section Button
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: saveCurrentSection,
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(
+                                  sectionSaved[_getSectionKey(currentStep)]!
+                                      ? 'Section Saved ✓'
+                                      : 'Save Section',
+                                  style: TextStyle(
+                                    color:
+                                        sectionSaved[_getSectionKey(
+                                          currentStep,
+                                        )]!
+                                        ? Colors.green
+                                        : primaryColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Login Link
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  "Already have an account? ",
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const Login(),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "Login",
+                                    style: TextStyle(
+                                      color: primaryColor,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

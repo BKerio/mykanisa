@@ -1,0 +1,229 @@
+import 'package:flutter/material.dart';
+import 'package:pcea_church/screen/account_summary.dart';
+import 'package:pcea_church/screen/add_dependents.dart';
+import 'package:pcea_church/screen/base_dashboard.dart';
+import 'package:pcea_church/screen/my_groups.dart';
+import 'package:pcea_church/screen/payments.dart';
+import 'package:pcea_church/screen/member_messages.dart';
+import 'package:pcea_church/screen/pledges.dart';
+
+class MemberDashboard extends BaseDashboard {
+  const MemberDashboard({super.key});
+
+  @override
+  String getRoleTitle() => 'Member';
+
+  @override
+  String getRoleDescription() =>
+      'Regular church member with access to personal profile and contribution features';
+
+  @override
+  List<DashboardCard> getDashboardCards(BuildContext context) {
+    return [
+      DashboardCard(
+        icon: Icons.account_balance_wallet_rounded,
+        title: 'My Account summary',
+        color: Colors.blue,
+        subtitle: 'View & edit profile',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const LedgerPage()),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.group,
+        title: 'My Dependents',
+        color: Colors.deepPurple,
+        subtitle: 'Manage family',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const DependentsScreen()),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.wallet_rounded,
+        title: 'Contribute via m-Pesa',
+        color: Colors.green,
+        subtitle: 'Make contributions',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PaymentsPage()),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.flag,
+        title: 'My Pledges',
+        color: Colors.orange,
+        subtitle: 'Manage pledges',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PledgesPage()),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.wallet_rounded,
+        title: 'Church groups',
+        color: Colors.green,
+        subtitle: 'Manage your church groups',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MyGroupsScreen()),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.event,
+        title: 'Church Events',
+        color: Colors.orange,
+        subtitle: 'View events',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ChurchEventsScreen()),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.notifications,
+        title: 'Messages',
+        color: Colors.teal,
+        subtitle: 'View messages from elders',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MemberMessagesScreen()),
+          );
+        },
+      ),
+    ];
+  }
+
+  @override
+  List<BottomNavigationBarItem> getBottomNavItems() {
+    return const [
+      BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+      BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+      BottomNavigationBarItem(icon: Icon(Icons.group), label: "Dependents"),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.account_balance_wallet),
+        label: "Payments",
+      ),
+      BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),
+    ];
+  }
+
+  @override
+  Color getPrimaryColor() => const Color(0xFF35C2C1); // Teal
+
+  @override
+  Color getSecondaryColor() => const Color(0xFF20BBA6); // Dark Teal
+
+  @override
+  IconData getRoleIcon() => Icons.person;
+}
+
+// Placeholder screens for Member-specific functionality
+class ChurchEventsScreen extends StatelessWidget {
+  const ChurchEventsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Church Events'),
+        backgroundColor: const Color(0xFF35C2C1),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event, size: 100, color: Colors.grey),
+            SizedBox(height: 20),
+            Text(
+              'Church Events',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'View upcoming church events and activities',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class NotificationsScreen extends StatelessWidget {
+  const NotificationsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Notifications'),
+        backgroundColor: const Color(0xFF35C2C1),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.notifications, size: 100, color: Colors.grey),
+            SizedBox(height: 20),
+            Text(
+              'Notifications',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'View church announcements and updates',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MinistryInvolvementScreen extends StatelessWidget {
+  const MinistryInvolvementScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ministry Involvement'),
+        backgroundColor: const Color(0xFF35C2C1),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.church, size: 100, color: Colors.grey),
+            SizedBox(height: 20),
+            Text(
+              'Ministry Involvement',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Explore opportunities to get involved in church ministries',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
