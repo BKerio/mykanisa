@@ -16,12 +16,12 @@ class _PaymentsPageState extends State<PaymentsPage> {
   final TextEditingController _phoneCtl = TextEditingController();
 
   final Map<String, TextEditingController> _amountCtrls = {
-    'Tithe': TextEditingController(text: '0'),
-    'Offering': TextEditingController(text: '0'),
-    'Development': TextEditingController(text: '0'),
-    'Thanksgiving': TextEditingController(text: '0'),
-    'FirstFruit': TextEditingController(text: '0'),
-    'Others': TextEditingController(text: '0'),
+    'Tithe': TextEditingController(text: ''),
+    'Offering': TextEditingController(text: ''),
+    'Development': TextEditingController(text: ''),
+    'Thanksgiving': TextEditingController(text: ''),
+    'FirstFruit': TextEditingController(text: ''),
+    'Others': TextEditingController(text: ''),
   };
 
   static const List<String> _accountTypes = [
@@ -38,6 +38,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Color _lastMessageColor = Colors.green;
   String? _lastCheckoutId;
   List<Map<String, dynamic>> _activePledges = [];
+  bool _phoneLoaded = false;
 
   double get _totalAmount {
     double sum = 0;
@@ -84,10 +85,14 @@ class _PaymentsPageState extends State<PaymentsPage> {
         }
       }
 
+      // Format phone number for M-Pesa (should be 254XXXXXXXXX format)
+      final phoneInput = _phoneCtl.text.trim();
+      final formattedPhone = _formatPhoneForMpesa(phoneInput);
+
       final resp = await API().postRequest(
         url: Uri.parse('${Config.baseUrl}/mpesa/stkpush'),
         data: {
-          'phone': _phoneCtl.text.trim(),
+          'phone': formattedPhone,
           'amount': _totalAmount,
           'reference': accountRef,
           'breakdown': breakdown,
@@ -137,10 +142,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
           if (state == 'success') {
             setState(() {
-              _lastMessage = msg.isNotEmpty ? msg : 'Payment successful!';
+              _lastMessage = msg.isNotEmpty ? msg : 'Contribution successful!';
               _lastMessageColor = Colors.green.shade700;
             });
-            // Reload pledges after successful payment
             _loadActivePledges();
             return;
           }
@@ -238,6 +242,107 @@ class _PaymentsPageState extends State<PaymentsPage> {
     } catch (e) {
       debugPrint('Error loading pledges: $e');
     } finally {}
+  }
+
+  Future<void> _loadPhoneNumber() async {
+    try {
+      // First try to get from SharedPreferences (member_profile)
+      final prefs = await SharedPreferences.getInstance();
+      final memberProfileJson = prefs.getString('member_profile');
+      if (memberProfileJson != null) {
+        try {
+          final profile = jsonDecode(memberProfileJson) as Map<String, dynamic>;
+          final telephone = profile['telephone']?.toString() ?? '';
+          if (telephone.isNotEmpty) {
+            setState(() {
+              _phoneCtl.text = _formatPhoneNumber(telephone);
+              _phoneLoaded = true;
+            });
+            return;
+          }
+        } catch (_) {
+          // Invalid JSON, continue to API
+        }
+      }
+
+      // If not in SharedPreferences, try to fetch from API
+      final res = await API().getRequest(
+        url: Uri.parse('${Config.baseUrl}/members/me'),
+      );
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final member = body['member'] as Map<String, dynamic>?;
+        final telephone = member?['telephone']?.toString() ?? '';
+        if (telephone.isNotEmpty) {
+          setState(() {
+            _phoneCtl.text = _formatPhoneNumber(telephone);
+            _phoneLoaded = true;
+          });
+          // Also save to SharedPreferences for future use
+          try {
+            Map<String, dynamic> profile;
+            if (memberProfileJson != null) {
+              profile = jsonDecode(memberProfileJson) as Map<String, dynamic>;
+            } else {
+              // Create a basic profile structure if it doesn't exist
+              profile = {'telephone': telephone};
+            }
+            profile['telephone'] = telephone;
+            await prefs.setString('member_profile', jsonEncode(profile));
+          } catch (_) {
+            // Ignore if updating profile fails
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading phone number: $e');
+    }
+  }
+
+  String _formatPhoneNumber(String phone) {
+    // Remove any non-digit characters
+    String cleaned = phone.replaceAll(RegExp(r'[^\d]'), '');
+
+    // If phone starts with 254, convert to local format (0XXXXXXXXX)
+    if (cleaned.startsWith('254') && cleaned.length == 12) {
+      return '0${cleaned.substring(3)}';
+    }
+
+    // If phone starts with 0, return as is (local format)
+    if (cleaned.startsWith('0')) {
+      return cleaned;
+    }
+
+    // If phone is 9 digits, add leading 0
+    if (cleaned.length == 9) {
+      return '0$cleaned';
+    }
+
+    // Return as is if it doesn't match any pattern
+    return cleaned;
+  }
+
+  String _formatPhoneForMpesa(String phone) {
+    // Remove any non-digit characters
+    String cleaned = phone.replaceAll(RegExp(r'[^\d]'), '');
+
+    // If phone starts with 254, return as is
+    if (cleaned.startsWith('254')) {
+      return cleaned;
+    }
+
+    // If phone starts with 0, replace with 254
+    if (cleaned.startsWith('0')) {
+      return '254${cleaned.substring(1)}';
+    }
+
+    // If phone is 9 digits, add 254 prefix
+    if (cleaned.length == 9) {
+      return '254$cleaned';
+    }
+
+    // Return as is if it doesn't match any pattern
+    return cleaned;
   }
 
   void _showPayPledgesDialog() {
@@ -350,9 +455,10 @@ class _PaymentsPageState extends State<PaymentsPage> {
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: ctrl,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               decoration: InputDecoration(
                                 labelText: 'Amount to pay (KES)',
                                 prefixIcon: const Icon(Icons.money),
@@ -423,8 +529,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     for (var entry in pledgeAmounts.entries) {
                       final accountType = entry.key;
                       final ctrl = dialogAmountCtrls[accountType]!;
-                      final amount =
-                          double.tryParse(ctrl.text.trim()) ?? 0;
+                      final amount = double.tryParse(ctrl.text.trim()) ?? 0;
                       final maxAmount = maxAmounts[accountType]!;
 
                       if (amount < 0 || amount > maxAmount) {
@@ -451,7 +556,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       final amount =
                           double.tryParse(entry.value.text.trim()) ?? 0;
                       if (_accountTypes.contains(accountType)) {
-                        _amountCtrls[accountType]!.text = amount.toStringAsFixed(2);
+                        _amountCtrls[accountType]!.text = amount
+                            .toStringAsFixed(2);
                       }
                     }
 
@@ -498,6 +604,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
   void initState() {
     super.initState();
     _loadActivePledges();
+    _loadPhoneNumber();
   }
 
   @override
@@ -505,43 +612,57 @@ class _PaymentsPageState extends State<PaymentsPage> {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: const Text('Cashless Contributions (M-Pesa)'),
-        backgroundColor: Color(0xFF0A1F44),
+        backgroundColor: const Color(0xFF0A1F44),
         foregroundColor: Colors.white,
         elevation: 2,
+        title: null, // Removed the title
+        centerTitle: true,
         actions: [
           if (_activePledges.isNotEmpty)
-            IconButton(
-              icon: Stack(
-                children: [
-                  const Icon(Icons.flag),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.orange,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 12,
-                        minHeight: 12,
-                      ),
-                      child: const Text(
-                        '',
-                        style: TextStyle(color: Colors.white, fontSize: 8),
-                        textAlign: TextAlign.center,
+            GestureDetector(
+              onTap: _showPayPledgesDialog,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Row(
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(
+                          Icons.flag_sharp,
+                          size: 28,
+                          color: Colors.orangeAccent,
+                        ),
+                        Positioned(
+                          right: -2,
+                          top: -2,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "View Your Pledges",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              onPressed: _showPayPledgesDialog,
-              tooltip: 'Pay Pledges',
             ),
         ],
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(
           left: 20,
@@ -585,8 +706,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
               Column(
                 children: [
                   Icon(
-                    Icons.account_balance_wallet,
-                    size: 100,
+                    Icons.wallet_rounded,
+                    size: 120,
                     color: Color(0xFF0A1F44),
                   ),
                   const SizedBox(height: 10),
@@ -620,16 +741,37 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   child: TextFormField(
                     controller: _phoneCtl,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Enter your M-Pesa phone number',
+                    decoration: InputDecoration(
+                      labelText: 'M-Pesa Phone Number',
                       hintText: '0712345678',
-                      prefixIcon: Icon(Icons.phone_android),
+                      prefixIcon: const Icon(Icons.phone_android),
                       border: InputBorder.none,
+                      helperText: _phoneLoaded
+                          ? 'Phone number loaded from your profile'
+                          : 'Enter your M-Pesa phone number',
+                      helperMaxLines: 1,
+                      helperStyle: TextStyle(
+                        fontSize: 12,
+                        color: _phoneLoaded
+                            ? Colors.green.shade700
+                            : Colors.grey.shade600,
+                      ),
                     ),
                     validator: (v) {
                       final t = (v ?? '').trim();
                       if (t.isEmpty) return 'Enter phone number';
-                      if (t.length < 9) return 'Enter a valid phone number';
+                      // Remove non-digits for validation
+                      final cleaned = t.replaceAll(RegExp(r'[^\d]'), '');
+                      // Should be 9 digits (0712345678) or 12 digits (254712345678)
+                      if (cleaned.length < 9 || cleaned.length > 12) {
+                        return 'Enter a valid phone number';
+                      }
+                      // Should start with 0, 254, or be 9 digits
+                      if (!cleaned.startsWith('0') &&
+                          !cleaned.startsWith('254') &&
+                          cleaned.length != 9) {
+                        return 'Enter a valid phone number';
+                      }
                       return null;
                     },
                   ),
@@ -728,7 +870,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
                           ),
                           decoration: InputDecoration(
                             labelText: 'Enter amount for $type (KES)',
-                            prefixIcon: const Icon(Icons.money),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -743,55 +884,28 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
               const SizedBox(height: 10),
 
-              // Total summary
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.teal.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.summarize, color: Color(0xFF0A1F44)),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Total amount to contribute:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'KES ${_totalAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0A1F44),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _submitting ? null : _submit,
                   icon: _submitting
                       ? const SizedBox(
-                          width: 18,
-                          height: 18,
+                          width: 24,
+                          height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: Colors.white,
                           ),
                         )
                       : const Icon(Icons.payment),
-                  label: const Text(
-                    'Make Contribution',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  label: Text(
+                    _submitting
+                        ? 'Processing...'
+                        : 'Make Contribution - KES ${_totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0A1F44),

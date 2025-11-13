@@ -109,7 +109,7 @@ class BaseDashboardState extends State<BaseDashboard> {
             if (imageUrl != null && imageUrl.toString().isNotEmpty) {
               final urlString = imageUrl.toString();
               await preferences!.setString('profile_image_url', urlString);
-              print('Profile image URL saved to preferences: $urlString');
+              //print('Profile image URL saved to preferences: $urlString');
             } else {
               print(
                 'No profile image URL in response - clearing from preferences',
@@ -968,7 +968,7 @@ class BaseDashboardState extends State<BaseDashboard> {
         width: 72,
         height: 72,
         decoration: BoxDecoration(
-          color: Colors.green,
+          color: Color(0xFF0A1F44),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(

@@ -72,7 +72,7 @@ class _RegisterState extends State<Register> {
   XFile? profileImage;
   final ImagePicker _imagePicker = ImagePicker();
 
-  // Section save states
+  // Section save states (Kept for compatibility with original validation logic if needed elsewhere, but unused in UI)
   Map<String, bool> sectionSaved = {
     'personal': false,
     'church': false,
@@ -237,6 +237,9 @@ class _RegisterState extends State<Register> {
   void removeDependent(int index) {
     setState(() {
       dependents.removeAt(index);
+      if (dependents.isEmpty) {
+        hasDependents = false;
+      }
     });
   }
 
@@ -294,10 +297,10 @@ class _RegisterState extends State<Register> {
     return years;
   }
 
-  Future<void> _pickProfileImage() async {
+  Future<void> _pickProfileImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 512,
         maxHeight: 512,
         imageQuality: 85,
@@ -312,13 +315,44 @@ class _RegisterState extends State<Register> {
     }
   }
 
+  void _showImageSourceActionSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickProfileImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickProfileImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   bool validateCurrentStep() {
+    // This validation is now used for the final submission check, ensuring critical fields are present.
     switch (currentStep) {
-      case 0: // Personal Info
+      case 0: // Personal Info: Must have Full Name, Email, DOB, Telephone
         return fullName.text.isNotEmpty &&
             email.text.isNotEmpty &&
-            dob.text.isNotEmpty;
-      case 1: // Church Details
+            dob.text.isNotEmpty &&
+            telephone.text.isNotEmpty;
+      case 1: // Church Details: Must select location hierarchy and enter congregation/district
         return selectedRegionId.isNotEmpty &&
             selectedPresbyteryId.isNotEmpty &&
             selectedParishId.isNotEmpty &&
@@ -326,7 +360,7 @@ class _RegisterState extends State<Register> {
             district.text.isNotEmpty;
       case 2: // Dependents (optional)
         return true;
-      case 3: // Security
+      case 3: // Security: Must have matching passwords of minimum length
         return password.text.isNotEmpty &&
             passwordConfirm.text.isNotEmpty &&
             password.text == passwordConfirm.text &&
@@ -336,47 +370,16 @@ class _RegisterState extends State<Register> {
     }
   }
 
-  Future<void> saveCurrentSection() async {
-    if (!validateCurrentStep()) {
-      _toast('Please complete all required fields');
-      return;
-    }
-
-    setState(() {
-      sectionSaved[_getSectionKey(currentStep)] = true;
-    });
-
-    _toast('Section saved successfully!');
-  }
-
-  String _getSectionKey(int step) {
-    switch (step) {
-      case 0:
-        return 'personal';
-      case 1:
-        return 'church';
-      case 2:
-        return 'dependents';
-      case 3:
-        return 'security';
-      default:
-        return '';
-    }
-  }
-
   void nextStep() {
     if (currentStep < totalSteps - 1) {
-      if (validateCurrentStep()) {
-        setState(() {
-          currentStep++;
-        });
-        _pageController.nextPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      } else {
-        _toast('Please complete all required fields');
-      }
+      // Allow navigation regardless of field completion status
+      setState(() {
+        currentStep++;
+      });
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -394,16 +397,26 @@ class _RegisterState extends State<Register> {
 
   Future<void> submit() async {
     if (isLoading) return;
-    if (!_formKey.currentState!.validate()) return;
 
-    // Validate all sections
+    // 1. Run form validation (for field-level checks like password matching)
+    if (!_formKey.currentState!.validate()) {
+      _toast('Please check the highlighted required fields on this page.');
+      // If validation fails on the current page, don't proceed.
+      return;
+    }
+
+    // 2. Run sequential step validation (for mandatory fields across all steps)
     for (int i = 0; i < totalSteps; i++) {
-      if (i == 2) continue; // Dependents are optional
+      // Temporarily switch to the page to validate
+      _pageController.jumpToPage(i);
+      setState(() {
+        currentStep = i; // Ensure state updates for visual indicators
+      });
+      await Future.delayed(Duration(milliseconds: 50)); // Allow UI to settle
+
       if (!validateCurrentStep()) {
-        _toast('Please complete all sections');
-        setState(() {
-          currentStep = i;
-        });
+        _toast('Please complete all mandatory fields in Step ${i + 1}');
+        // Re-animate to the faulty step for user correction
         _pageController.animateToPage(
           i,
           duration: const Duration(milliseconds: 300),
@@ -413,7 +426,12 @@ class _RegisterState extends State<Register> {
       }
     }
 
-    // Conditional national ID requirement
+    // Revert to the final step indicator
+    setState(() {
+      currentStep = totalSteps - 1;
+    });
+
+    // 3. Conditional national ID requirement check
     final parsedDob = DateTime.tryParse(dob.text);
     final computedAge = parsedDob != null ? _calculateAge(parsedDob) : null;
     if ((computedAge ?? 0) >= 18 && (nationalId.text.trim().isEmpty)) {
@@ -421,6 +439,7 @@ class _RegisterState extends State<Register> {
       return;
     }
 
+    // 4. Process Dependents
     final deps = hasDependents
         ? dependents
               .map((d) {
@@ -458,6 +477,7 @@ class _RegisterState extends State<Register> {
               .toList()
         : <Map<String, dynamic>>[];
 
+    // 5. API Submission
     try {
       setState(() => isLoading = true);
 
@@ -588,11 +608,13 @@ class _RegisterState extends State<Register> {
         border: Border.all(color: Colors.grey.shade300),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: TextField(
+      child: TextFormField(
+        // Switched to TextFormField for inherent validation handling on submit
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
         onTap: onTap,
+        validator: validator,
         decoration: InputDecoration(
           hintText: hintText,
           border: InputBorder.none,
@@ -602,8 +624,6 @@ class _RegisterState extends State<Register> {
       ),
     );
   }
-
-  // Helper method to create dropdown fields
 
   Widget _buildStepIndicator() {
     return Row(
@@ -622,12 +642,54 @@ class _RegisterState extends State<Register> {
     );
   }
 
-  Widget _buildPersonalInfoStep() {
+  Widget _buildStepHeader({
+    required String title,
+    required String subtitle,
+    bool showLogo = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (showLogo) ...[
+          // Circular logo with shadow
+          Center(
+            child: Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: ClipOval(
+                  child: Image.asset("assets/icon.png", fit: BoxFit.contain),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: Text(
+              "Member Registration",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: darkBlue,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24), // Extra space after header
+        ],
         Text(
-          "Personal Information",
+          title,
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -635,18 +697,31 @@ class _RegisterState extends State<Register> {
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          "Tell us about yourself",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 16, color: Colors.grey),
         ),
         const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildPersonalInfoStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepHeader(
+          title: "Personal Information",
+          subtitle: "Tell us about yourself",
+          showLogo: true, // Show logo only on the first step
+        ),
 
         // Profile Image Upload
         Center(
           child: Column(
             children: [
               GestureDetector(
-                onTap: _pickProfileImage,
+                onTap: () => _showImageSourceActionSheet(context),
                 child: Container(
                   width: 100,
                   height: 100,
@@ -697,28 +772,31 @@ class _RegisterState extends State<Register> {
 
         _buildInputField(
           controller: fullName,
-          hintText: "Enter full member name",
+          hintText: "Enter full member name *",
           icon: Icons.person,
           validator: (value) => (value == null || value.isEmpty)
-              ? 'Please enter full name'
+              ? 'Full name is mandatory'
               : null,
         ),
         const SizedBox(height: 16),
 
         _buildInputField(
           controller: dob,
-          hintText: dob.text.isEmpty ? 'Date of Birth' : dob.text,
+          hintText: dob.text.isEmpty ? 'Date of Birth *' : dob.text,
           icon: Icons.calendar_month_outlined,
           onTap: pickDob,
           suffixIcon: age != null
               ? Text('Age: $age', style: const TextStyle(color: Colors.grey))
+              : null,
+          validator: (value) => (value == null || value.isEmpty)
+              ? 'Date of Birth is mandatory'
               : null,
         ),
         const SizedBox(height: 16),
 
         _buildInputField(
           controller: nationalId,
-          hintText: "National ID Number (Optional) for under 18s",
+          hintText: "National ID Number (Required for 18+)",
           icon: Icons.card_membership_rounded,
           keyboardType: TextInputType.text,
         ),
@@ -726,12 +804,11 @@ class _RegisterState extends State<Register> {
 
         _buildInputField(
           controller: email,
-          hintText: "Enter your email address",
+          hintText: "Enter your email address *",
           icon: Icons.email,
           keyboardType: TextInputType.emailAddress,
-          validator: (value) => (value == null || value.isEmpty)
-              ? 'Please enter your email'
-              : null,
+          validator: (value) =>
+              (value == null || value.isEmpty) ? 'Email is mandatory' : null,
         ),
         const SizedBox(height: 16),
 
@@ -873,9 +950,12 @@ class _RegisterState extends State<Register> {
 
         _buildInputField(
           controller: telephone,
-          hintText: "Enter phone number (0712345678)",
+          hintText: "Enter phone number (0712345678) *",
           icon: Icons.phone_android_rounded,
           keyboardType: TextInputType.phone,
+          validator: (value) => (value == null || value.isEmpty)
+              ? 'Phone number is mandatory'
+              : null,
         ),
         const SizedBox(height: 16),
 
@@ -991,23 +1071,18 @@ class _RegisterState extends State<Register> {
   }
 
   Widget _buildChurchDetailsStep() {
+    // Helper function to determine the color for location fields (no red when empty)
+    Color locationTextColor(String value) {
+      return value.isEmpty ? Colors.black54 : Colors.black;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          "Church Location",
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: darkBlue,
-          ),
+        _buildStepHeader(
+          title: "Church Location",
+          subtitle: "Select your church details",
         ),
-        const SizedBox(height: 8),
-        const Text(
-          "Select your church details",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-        const SizedBox(height: 24),
 
         // Region (Searchable Picker)
         GestureDetector(
@@ -1027,7 +1102,7 @@ class _RegisterState extends State<Register> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isLoadingRegions ? 'Loading regions...' : 'Region',
+                        isLoadingRegions ? 'Loading regions...' : 'Region *',
                         style: const TextStyle(
                           color: Colors.black54,
                           fontSize: 12,
@@ -1040,7 +1115,10 @@ class _RegisterState extends State<Register> {
                                   ? 'Please wait'
                                   : 'Select Region (searchable)')
                             : selectedRegionName,
-                        style: const TextStyle(fontSize: 16),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: locationTextColor(selectedRegionName),
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1078,7 +1156,7 @@ class _RegisterState extends State<Register> {
                             ? 'Loading presbyteries...'
                             : presbyteries.isEmpty
                             ? 'Select a region first'
-                            : 'Presbytery',
+                            : 'Presbytery *',
                         style: const TextStyle(
                           color: Colors.black54,
                           fontSize: 12,
@@ -1092,7 +1170,10 @@ class _RegisterState extends State<Register> {
                                   ? 'Select a region first'
                                   : 'Select Presbytery (searchable)')
                             : selectedPresbyteryName,
-                        style: const TextStyle(fontSize: 16),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: locationTextColor(selectedPresbyteryName),
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1130,7 +1211,7 @@ class _RegisterState extends State<Register> {
                             ? 'Loading parishes...'
                             : parishes.isEmpty
                             ? 'Select a presbytery first'
-                            : 'Parish',
+                            : 'Parish *',
                         style: const TextStyle(
                           color: Colors.black54,
                           fontSize: 12,
@@ -1144,7 +1225,10 @@ class _RegisterState extends State<Register> {
                                   ? 'Select a presbytery first'
                                   : 'Select Parish (searchable)')
                             : selectedParishName,
-                        style: const TextStyle(fontSize: 16),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: locationTextColor(selectedParishName),
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1160,7 +1244,7 @@ class _RegisterState extends State<Register> {
 
         _buildInputField(
           controller: congregation,
-          hintText: "Congregation (Church) Name",
+          hintText: "Congregation (Church) Name *",
           icon: Icons.church,
           validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
         ),
@@ -1168,13 +1252,162 @@ class _RegisterState extends State<Register> {
 
         _buildInputField(
           controller: district,
-          hintText: "District",
+          hintText: "District *",
           icon: Icons.location_on,
           validator: (v) =>
               (v == null || v.isEmpty) ? 'District is required' : null,
         ),
-        // Note: Groups selection moved to Personal Information step
       ],
+    );
+  }
+
+  Widget _buildDependentCard(int i, Map<String, dynamic> d) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    (d['name'] as TextEditingController).text.isEmpty
+                        ? 'Dependent ${i + 1}'
+                        : (d['name'] as TextEditingController).text,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: darkBlue,
+                      fontSize: 18,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Remove Dependent',
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.redAccent,
+                    ),
+                    onPressed: () => removeDependent(i),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: d['name'],
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () => pickDependentDob(i),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Date of Birth',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event, color: Colors.grey, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          (d['year_of_birth'] as TextEditingController)
+                                  .text
+                                  .isEmpty
+                              ? 'Select Date of Birth'
+                              : (d['year_of_birth'] as TextEditingController)
+                                    .text,
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: (d['birth_cert'] as TextEditingController),
+                keyboardType: TextInputType.number,
+                maxLength: 9,
+                decoration: const InputDecoration(
+                  labelText: 'Birth Certificate No (9 digits)',
+                  border: OutlineInputBorder(),
+                  counterText: '',
+                  isDense: true,
+                ),
+                validator: (v) {
+                  final t = (v ?? '').trim();
+                  if (t.isEmpty) return null; // optional
+                  if (t.length != 9 || int.tryParse(t) == null) {
+                    return 'Enter exactly 9 digits';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: CheckboxListTile(
+                      value: d['is_baptized'],
+                      onChanged: (v) =>
+                          setState(() => d['is_baptized'] = v ?? false),
+                      title: const Text(
+                        'Baptized',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ),
+                  Expanded(
+                    child: CheckboxListTile(
+                      value: d['takes_holy_communion'],
+                      onChanged: (v) => setState(
+                        () => d['takes_holy_communion'] = v ?? false,
+                      ),
+                      title: const Text(
+                        'Holy Communion',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: d['school'],
+                decoration: const InputDecoration(
+                  labelText: "School (optional)",
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1182,24 +1415,25 @@ class _RegisterState extends State<Register> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          "Add your dependents (Optional)",
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: darkBlue,
-          ),
+        _buildStepHeader(
+          title: "Add your dependents (Optional)",
+          subtitle: "Add information about your children or dependents",
         ),
-        const SizedBox(height: 8),
-        const Text(
-          "Add information about your dependents",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-        const SizedBox(height: 24),
 
         CheckboxListTile(
           value: hasDependents,
-          onChanged: (v) => setState(() => hasDependents = v ?? false),
+          onChanged: (v) {
+            setState(() {
+              hasDependents = v ?? false;
+              // If checked and list is empty, auto-add the first dependent.
+              if (hasDependents && dependents.isEmpty) {
+                addDependent();
+              } else if (!hasDependents) {
+                // If unchecked, clear list.
+                dependents.clear();
+              }
+            });
+          },
           title: const Text(
             'Do you have dependents to add?',
             style: TextStyle(fontWeight: FontWeight.w600),
@@ -1211,201 +1445,30 @@ class _RegisterState extends State<Register> {
         if (hasDependents) ...[
           const SizedBox(height: 16),
           ...List.generate(dependents.length, (i) {
-            final d = dependents[i];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade300),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            height: 28,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.child_care,
-                                  size: 16,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Dependent ${i + 1}',
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            tooltip: 'Remove',
-                            onPressed: () => removeDependent(i),
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.redAccent,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: d['name'],
-                              decoration: const InputDecoration(
-                                labelText: 'Dependent Full Name *',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () => pickDependentDob(i),
-                              child: InputDecorator(
-                                decoration: const InputDecoration(
-                                  labelText: 'Year Of Birth *',
-                                  border: OutlineInputBorder(),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.event, color: Colors.grey),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        (d['year_of_birth']
-                                                    as TextEditingController)
-                                                .text
-                                                .isEmpty
-                                            ? 'Select DOB'
-                                            : (d['year_of_birth']
-                                                      as TextEditingController)
-                                                  .text,
-                                        style: const TextStyle(
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Birth Certificate Number
-                      TextFormField(
-                        controller: (d['birth_cert'] as TextEditingController),
-                        keyboardType: TextInputType.number,
-                        maxLength: 9,
-                        decoration: const InputDecoration(
-                          labelText:
-                              'Enter dependents Birth Certificate No(9 digits)',
-                          border: OutlineInputBorder(),
-                          counterText: '',
-                        ),
-                        validator: (v) {
-                          final t = (v ?? '').trim();
-                          if (t.isEmpty) return null; // optional
-                          if (t.length != 9 || int.tryParse(t) == null) {
-                            return 'Enter exactly 9 digits';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: CheckboxListTile(
-                              value: d['is_baptized'],
-                              onChanged: (v) =>
-                                  setState(() => d['is_baptized'] = v ?? false),
-                              title: const Text('Baptized'),
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
-                          ),
-                          Expanded(
-                            child: CheckboxListTile(
-                              value: d['takes_holy_communion'],
-                              onChanged: (v) => setState(
-                                () => d['takes_holy_communion'] = v ?? false,
-                              ),
-                              title: const Text('Holy Communion'),
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: d['school'],
-                        decoration: const InputDecoration(
-                          labelText: "School they've enrolled in (optional)",
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                    ],
-                  ),
-                ),
-              ),
-            );
+            return _buildDependentCard(i, dependents[i]);
           }),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
+          Center(
+            child: ElevatedButton.icon(
               onPressed: addDependent,
-              style: OutlinedButton.styleFrom(
+              style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
-                  vertical: 14,
+                  vertical: 10,
                   horizontal: 16,
                 ),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                elevation: 2,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                side: BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 1.5,
-                ),
-                foregroundColor: Theme.of(context).colorScheme.primary,
-                overlayColor: Theme.of(
-                  context,
-                ).colorScheme.primary.withOpacity(0.1),
-              ),
-              icon: const Icon(Icons.add_circle_outline, size: 22),
-              label: const Text(
-                'Add Dependent',
-                style: TextStyle(
-                  fontSize: 16,
+                textStyle: const TextStyle(
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.4,
                 ),
               ),
+
+              label: const Text('Add Dependent'),
             ),
           ),
         ],
@@ -1417,24 +1480,14 @@ class _RegisterState extends State<Register> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          "Account Security",
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: darkBlue,
-          ),
+        _buildStepHeader(
+          title: "Account Security",
+          subtitle: "Create a secure password for your account",
         ),
-        const SizedBox(height: 8),
-        const Text(
-          "Create a secure password for your account",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-        const SizedBox(height: 24),
 
         _buildInputField(
           controller: password,
-          hintText: "Create a strong password",
+          hintText: "Create a strong password *",
           icon: Icons.lock_outlined,
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
@@ -1447,7 +1500,7 @@ class _RegisterState extends State<Register> {
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Please create a strong password';
+              return 'Password is mandatory';
             }
             if (value.length < 6) {
               return 'Password must be at least 6 characters';
@@ -1459,7 +1512,7 @@ class _RegisterState extends State<Register> {
 
         _buildInputField(
           controller: passwordConfirm,
-          hintText: "Confirm your password",
+          hintText: "Confirm your password *",
           icon: Icons.lock_outlined,
           obscureText: _obscurePassword,
           suffixIcon: IconButton(
@@ -1968,6 +2021,46 @@ class _RegisterState extends State<Register> {
     );
   }
 
+  Widget _CreativeArrowButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required bool isForward,
+  }) {
+    final color = onPressed != null ? primaryColor : Colors.grey.shade400;
+
+    Widget buttonContent = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!isForward) ...[
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+        ],
+        if (isForward) ...[
+          Text(
+            label,
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 6),
+          Icon(icon, color: color, size: 20),
+        ],
+      ],
+    );
+
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(50),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: buttonContent,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1975,52 +2068,7 @@ class _RegisterState extends State<Register> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // Circular logo with shadow
-                  Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: ClipOval(
-                        child: Image.asset(
-                          "assets/icon.png",
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "Member Registration",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: darkBlue,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildStepIndicator(),
-                ],
-              ),
-            ),
-
-            // Main Content
+            // Main Content Area
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -2035,10 +2083,11 @@ class _RegisterState extends State<Register> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      // Page View with scrollable content
+                      // Page View with scrollable content (swappable enabled)
                       Expanded(
                         child: PageView(
                           controller: _pageController,
+                          // Swapping enabled here
                           onPageChanged: (index) {
                             setState(() {
                               currentStep = index;
@@ -2046,26 +2095,46 @@ class _RegisterState extends State<Register> {
                           },
                           children: [
                             SingleChildScrollView(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.only(
+                                left: 24,
+                                right: 24,
+                                top: 24,
+                                bottom: 40,
+                              ),
                               child: _buildPersonalInfoStep(),
                             ),
                             SingleChildScrollView(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.only(
+                                left: 24,
+                                right: 24,
+                                top: 24,
+                                bottom: 40,
+                              ),
                               child: _buildChurchDetailsStep(),
                             ),
                             SingleChildScrollView(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.only(
+                                left: 24,
+                                right: 24,
+                                top: 24,
+                                bottom: 40,
+                              ),
                               child: _buildDependentsStep(),
                             ),
                             SingleChildScrollView(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.only(
+                                left: 24,
+                                right: 24,
+                                top: 24,
+                                bottom: 40,
+                              ),
                               child: _buildSecurityStep(),
                             ),
                           ],
                         ),
                       ),
 
-                      // Fixed bottom section with navigation buttons
+                      // Fixed bottom section with navigation controls
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: const BoxDecoration(
@@ -2085,90 +2154,42 @@ class _RegisterState extends State<Register> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Navigation Buttons
+                            // Creative Navigation Bar
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                if (currentStep > 0)
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: previousStep,
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                      ),
-                                      child: const Text('Previous'),
-                                    ),
-                                  ),
-                                if (currentStep > 0) const SizedBox(width: 16),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: currentStep == totalSteps - 1
-                                        ? (isLoading ? null : submit)
-                                        : nextStep,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: primaryColor,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    child: isLoading
-                                        ? const CircularProgressIndicator(
-                                            color: Colors.green,
-                                          )
-                                        : Text(
-                                            currentStep == totalSteps - 1
-                                                ? 'Complete Registration'
-                                                : 'Next',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                  ),
+                                // Previous Button
+                                _CreativeArrowButton(
+                                  label: 'Previous',
+                                  icon: Icons.arrow_back_ios_new_rounded,
+                                  isForward: false,
+                                  onPressed: currentStep > 0
+                                      ? previousStep
+                                      : null,
                                 ),
+
+                                // Step Indicator
+                                _buildStepIndicator(),
+
+                                // Next Button
+                                currentStep == totalSteps - 1
+                                    ? _CreativeArrowButton(
+                                        label: isLoading
+                                            ? 'Registering...'
+                                            : 'Finish',
+                                        icon: isLoading
+                                            ? Icons.hourglass_top
+                                            : Icons.check_circle_outline,
+                                        isForward: true,
+                                        onPressed: isLoading ? null : submit,
+                                      )
+                                    : _CreativeArrowButton(
+                                        label: 'Next',
+                                        icon: Icons.arrow_forward_ios_rounded,
+                                        isForward: true,
+                                        onPressed: nextStep,
+                                      ),
                               ],
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Save Section Button
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                onPressed: saveCurrentSection,
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Text(
-                                  sectionSaved[_getSectionKey(currentStep)]!
-                                      ? 'Section Saved ✓'
-                                      : 'Save Section',
-                                  style: TextStyle(
-                                    color:
-                                        sectionSaved[_getSectionKey(
-                                          currentStep,
-                                        )]!
-                                        ? Colors.green
-                                        : primaryColor,
-                                  ),
-                                ),
-                              ),
                             ),
 
                             const SizedBox(height: 16),

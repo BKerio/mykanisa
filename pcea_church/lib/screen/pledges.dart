@@ -16,11 +16,60 @@ class _PledgesPageState extends State<PledgesPage> {
   List<Map<String, dynamic>> _pledges = [];
   Map<String, dynamic>? _summary;
   String _filterStatus = 'all'; // all, active, fulfilled, cancelled
+  bool _showCreateForm = false;
+  bool _submitting = false;
+
+  static const List<String> _accountTypes = [
+    'Tithe',
+    'Offering',
+    'Development',
+    'Thanksgiving',
+    'FirstFruit',
+    'Others',
+  ];
+
+  final Map<String, TextEditingController> _pledgeAmountCtrls = {
+    'Tithe': TextEditingController(text: ''),
+    'Offering': TextEditingController(text: ''),
+    'Development': TextEditingController(text: ''),
+    'Thanksgiving': TextEditingController(text: ''),
+    'FirstFruit': TextEditingController(text: ''),
+    'Others': TextEditingController(text: ''),
+  };
+
+  final Map<String, TextEditingController> _descriptionCtrls = {
+    'Tithe': TextEditingController(text: ''),
+    'Offering': TextEditingController(text: ''),
+    'Development': TextEditingController(text: ''),
+    'Thanksgiving': TextEditingController(text: ''),
+    'FirstFruit': TextEditingController(text: ''),
+    'Others': TextEditingController(text: ''),
+  };
+
+  final Map<String, DateTime?> _targetDates = {
+    'Tithe': null,
+    'Offering': null,
+    'Development': null,
+    'Thanksgiving': null,
+    'FirstFruit': null,
+    'Others': null,
+  };
 
   @override
   void initState() {
     super.initState();
     _loadPledges();
+  }
+
+  @override
+  void dispose() {
+    for (var ctrl in _pledgeAmountCtrls.values) {
+      ctrl.dispose();
+    }
+    for (var ctrl in _descriptionCtrls.values) {
+      ctrl.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _loadPledges() async {
@@ -60,7 +109,135 @@ class _PledgesPageState extends State<PledgesPage> {
   }
 
   Future<void> _createPledge() async {
-    await _showPledgeDialog();
+    setState(() {
+      _showCreateForm = true;
+    });
+  }
+
+  void _cancelCreatePledge() {
+    setState(() {
+      _showCreateForm = false;
+      // Clear all form fields
+      for (var ctrl in _pledgeAmountCtrls.values) {
+        ctrl.clear();
+      }
+      for (var ctrl in _descriptionCtrls.values) {
+        ctrl.clear();
+      }
+      for (var key in _targetDates.keys) {
+        _targetDates[key] = null;
+      }
+    });
+  }
+
+  double _getTotalPledgeAmount() {
+    double sum = 0;
+    for (final ctrl in _pledgeAmountCtrls.values) {
+      final n = double.tryParse(ctrl.text.trim()) ?? 0;
+      sum += n;
+    }
+    return sum;
+  }
+
+  Future<void> _submitPledges() async {
+    if (_submitting) return;
+
+    // Validate that at least one pledge amount is entered
+    if (_getTotalPledgeAmount() <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter at least one pledge amount.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    try {
+      // Build list of pledges to create
+      final List<Map<String, dynamic>> pledgesToCreate = [];
+
+      for (final accountType in _accountTypes) {
+        final amount = double.tryParse(_pledgeAmountCtrls[accountType]!.text.trim()) ?? 0;
+        if (amount > 0) {
+          final pledgeData = <String, dynamic>{
+            'account_type': accountType,
+            'pledge_amount': amount,
+          };
+
+          final description = _descriptionCtrls[accountType]!.text.trim();
+          if (description.isNotEmpty) {
+            pledgeData['description'] = description;
+          }
+
+          final targetDate = _targetDates[accountType];
+          if (targetDate != null) {
+            pledgeData['target_date'] = DateFormat('yyyy-MM-dd').format(targetDate);
+          }
+
+          pledgesToCreate.add(pledgeData);
+        }
+      }
+
+      // Create pledges one by one (or update backend to accept bulk)
+      int successCount = 0;
+      int failCount = 0;
+
+      for (final pledgeData in pledgesToCreate) {
+        try {
+          final res = await API().postRequest(
+            url: Uri.parse('${Config.baseUrl}/member/pledges'),
+            data: pledgeData,
+          );
+
+          if (res.statusCode == 201) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (e) {
+          failCount++;
+          debugPrint('Error creating pledge for ${pledgeData['account_type']}: $e');
+        }
+      }
+
+      if (mounted) {
+        if (successCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                failCount > 0
+                    ? '$successCount pledge(s) created. $failCount failed.'
+                    : '$successCount pledge(s) created successfully!',
+              ),
+              backgroundColor: failCount > 0 ? Colors.orange : Colors.green,
+            ),
+          );
+          _cancelCreatePledge();
+          _loadPledges();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create pledges. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   Future<void> _editPledge(Map<String, dynamic> pledge) async {
@@ -377,6 +554,10 @@ class _PledgesPageState extends State<PledgesPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showCreateForm) {
+      return _buildCreateForm();
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
@@ -434,6 +615,255 @@ class _PledgesPageState extends State<PledgesPage> {
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('New Pledge'),
+      ),
+    );
+  }
+
+  Widget _buildCreateForm() {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      appBar: AppBar(
+        title: const Text('Create Pledges'),
+        backgroundColor: const Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
+        elevation: 2,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _cancelCreatePledge,
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 100,
+        ),
+        child: Column(
+          children: [
+            // Header
+            Column(
+              children: [
+                const Icon(
+                  Icons.flag,
+                  size: 120,
+                  color: Color(0xFF0A1F44),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "Create Your Pledges",
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  "Pledge to multiple accounts at once",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            const SizedBox(height: 25),
+
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Select accounts to pledge to:',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // ExpansionTiles for each account type
+            ..._accountTypes.map((type) {
+              final amountCtrl = _pledgeAmountCtrls[type]!;
+              final descCtrl = _descriptionCtrls[type]!;
+              final targetDate = _targetDates[type];
+
+              return Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ExpansionTile(
+                  leading: Icon(_iconForType(type), color: const Color(0xFF0A1F44)),
+                  title: Text(
+                    type,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  subtitle: amountCtrl.text.isNotEmpty
+                      ? Text(
+                          'KES ${(double.tryParse(amountCtrl.text.trim()) ?? 0).toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      : null,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: amountCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Pledge Amount (KES)',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            validator: (v) {
+                              final amount = double.tryParse(v ?? '') ?? 0;
+                              if (amount < 0) return 'Amount cannot be negative';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: descCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'Description (Optional)',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            maxLines: 2,
+                          ),
+                          const SizedBox(height: 12),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.calendar_today),
+                            title: Text(
+                              targetDate == null
+                                  ? 'Target Date (Optional)'
+                                  : 'Target: ${DateFormat('yyyy-MM-dd').format(targetDate)}',
+                            ),
+                            trailing: targetDate != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 20),
+                                    onPressed: () {
+                                      setState(() {
+                                        _targetDates[type] = null;
+                                      });
+                                    },
+                                  )
+                                : null,
+                            onTap: () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                initialDate: targetDate ??
+                                    DateTime.now().add(const Duration(days: 30)),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365 * 2),
+                                ),
+                              );
+                              if (date != null) {
+                                setState(() {
+                                  _targetDates[type] = date;
+                                });
+                              }
+                            },
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: BorderSide(color: Colors.grey.shade300),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+
+            const SizedBox(height: 16),
+
+            // Total summary
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.summarize, color: Color(0xFF0A1F44)),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Total Pledge Amount:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'KES ${_getTotalPledgeAmount().toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0A1F44),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _submitting ? null : _submitPledges,
+                icon: _submitting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.flag),
+                label: Text(
+                  _submitting
+                      ? 'Creating...'
+                      : 'Create Pledges - KES ${_getTotalPledgeAmount().toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0A1F44),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

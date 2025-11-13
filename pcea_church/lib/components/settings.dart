@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pcea_church/screen/digital_card.dart';
 import 'package:pcea_church/screen/profile.dart';
 import 'package:pcea_church/screen/view_dependents.dart';
 import 'package:pcea_church/theme/theme_controller.dart';
@@ -17,9 +18,23 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Settings"),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: const Color(0xFF0A1F44),
+        elevation: 2,
+        centerTitle: true,
+        title: const Text(
+          "Application Settings",
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 0.5,
+          ),
+        ),
+        iconTheme: const IconThemeData(
+          color: Colors.white, // Ensures back arrow or icons stay white
+        ),
       ),
+
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -49,6 +64,20 @@ class _SettingsPageState extends State<SettingsPage> {
                   MaterialPageRoute(
                     builder: (_) => const DependentFormScreen(),
                   ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.card_membership_rounded),
+              title: const Text('My Membership'),
+              subtitle: const Text('View my digital membership card'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DigitalCardScreen()),
                 );
               },
             ),
@@ -85,7 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     subtitle: Slider(
                       value: ThemeController.instance.textScaleFactor,
                       min: 0.9,
-                      max: 1.6,
+                      max: 1.8,
                       divisions: 7,
                       label:
                           '${ThemeController.instance.textScaleFactor.toStringAsFixed(1)}x',
@@ -106,16 +135,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     value: ThemeController.instance.boldText,
                     onChanged: (val) async {
                       await ThemeController.instance.setBoldText(val);
-                      setState(() {});
-                    },
-                  ),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.all(0),
-                    secondary: const Icon(Icons.contrast_rounded),
-                    title: const Text('High contrast'),
-                    value: ThemeController.instance.highContrast,
-                    onChanged: (val) async {
-                      await ThemeController.instance.setHighContrast(val);
                       setState(() {});
                     },
                   ),

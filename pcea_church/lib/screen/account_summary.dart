@@ -243,7 +243,9 @@ class _LedgerPageState extends State<LedgerPage> {
           final pledgeAmount = _toDouble(pledge['pledge_amount']);
           final fulfilledAmount = _toDouble(pledge['fulfilled_amount']);
           final remainingAmount = _toDouble(pledge['remaining_amount']);
-          final status = (pledge['status'] ?? 'active').toString().toUpperCase();
+          final status = (pledge['status'] ?? 'active')
+              .toString()
+              .toUpperCase();
           final accountType = (pledge['account_type'] ?? '').toString();
 
           totalPledged += pledgeAmount;
@@ -339,7 +341,10 @@ class _LedgerPageState extends State<LedgerPage> {
                         color: PdfColors.blue,
                       ),
                       cellAlignment: pw.Alignment.centerRight,
-                      cellAlignments: {0: pw.Alignment.centerLeft, 4: pw.Alignment.centerLeft},
+                      cellAlignments: {
+                        0: pw.Alignment.centerLeft,
+                        4: pw.Alignment.centerLeft,
+                      },
                       border: pw.TableBorder.all(color: PdfColors.grey300),
                     ),
                     pw.SizedBox(height: 30),
@@ -448,7 +453,8 @@ class _LedgerPageState extends State<LedgerPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      floatingActionButton: (_payments.isNotEmpty || _pledges.isNotEmpty) && !_loading
+      floatingActionButton:
+          (_payments.isNotEmpty || _pledges.isNotEmpty) && !_loading
           ? FloatingActionButton.extended(
               onPressed: _isExporting ? null : _exportToPdf,
               backgroundColor: AppColors.accent,
@@ -554,7 +560,8 @@ class _LedgerPageState extends State<LedgerPage> {
 
                               // Table Section
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     "Monthly Breakdown",
@@ -946,7 +953,10 @@ class _LedgerPageState extends State<LedgerPage> {
               columnSpacing: 24,
               horizontalMargin: 20,
               border: TableBorder(
-                verticalInside: BorderSide(color: Colors.grey.shade100, width: 1),
+                verticalInside: BorderSide(
+                  color: Colors.grey.shade100,
+                  width: 1,
+                ),
               ),
               columns: const [
                 DataColumn(
@@ -1068,10 +1078,7 @@ class _LedgerPageState extends State<LedgerPage> {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 4),
         Text(

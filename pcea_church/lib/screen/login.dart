@@ -257,8 +257,8 @@ class _LoginState extends State<Login> {
                               : email,
                           decoration: InputDecoration(
                             hintText: _loginMode == 'Use your Kanisa number'
-                                ? "Enter Kanisa Number"
-                                : "Enter Email Address",
+                                ? "Enter your kanisa number"
+                                : "Enter your email address",
                             border: InputBorder.none,
                             prefixIcon: Icon(
                               _loginMode == 'Use your Kanisa number'
@@ -286,7 +286,7 @@ class _LoginState extends State<Login> {
                           controller: password,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
-                            hintText: "Password",
+                            hintText: "Enter your password",
                             border: InputBorder.none,
                             prefixIcon: const Icon(
                               Icons.lock,

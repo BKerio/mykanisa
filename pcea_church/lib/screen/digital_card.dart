@@ -18,6 +18,7 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
   Map<String, dynamic>? memberData;
   bool isLoading = true;
   String? errorMessage;
+  final GlobalKey _cardKey = GlobalKey();
 
   @override
   void initState() {
@@ -78,7 +79,6 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
 
   Future<void> _saveCardToGallery() async {
     try {
-      // Check if gal has permission
       bool hasAccess = await Gal.hasAccess();
       if (!hasAccess) {
         bool granted = await Gal.requestAccess();
@@ -88,14 +88,12 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
         }
       }
 
-      // Capture the card as image
       final RenderRepaintBoundary boundary =
           _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ImageByteFormat.png);
       final pngBytes = byteData!.buffer.asUint8List();
 
-      // Save to gallery using gal
       await Gal.putImageBytes(
         pngBytes,
         album: "PCEA Church",
@@ -151,12 +149,10 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black,
                     errorStateBuilder: (cxt, err) {
-                      return Container(
-                        child: const Center(
-                          child: Text(
-                            'QR Code Error',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                      return const Center(
+                        child: Text(
+                          'QR Code Error',
+                          style: TextStyle(fontSize: 16),
                         ),
                       );
                     },
@@ -187,8 +183,6 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
       },
     );
   }
-
-  final GlobalKey _cardKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -249,11 +243,13 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
   }
 
   Widget _buildDigitalCard() {
+    final imageUrl = memberData?['profile_image_url'];
+
     return Container(
       width: 480,
       height: 380,
       decoration: BoxDecoration(
-        color: Color(0xFF0A1F44),
+        color: const Color(0xFF0A1F44),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -297,23 +293,28 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
+                // Header with circular profile
                 Row(
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Image.asset(
-                          "assets/icon.png",
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                    ClipOval(
+                      child: imageUrl != null && imageUrl.isNotEmpty
+                          ? Image.network(
+                              imageUrl,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Image.asset(
+                                    'assets/icon.png',
+                                    width: 60,
+                                    height: 60,
+                                  ),
+                            )
+                          : Image.asset(
+                              'assets/icon.png',
+                              width: 60,
+                              height: 60,
+                            ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -321,7 +322,7 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'PCEA CHURCH',
+                            'PCEA Church',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -345,11 +346,11 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
 
                 const SizedBox(height: 16),
 
-                // Main content area with member details and QR code
+                // Main content
                 Expanded(
                   child: Row(
                     children: [
-                      // Left side - Member details
+                      // Member details
                       Expanded(
                         flex: 2,
                         child: Column(
@@ -366,7 +367,7 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'E-Kanisa: ${memberData!['e_kanisa_number'] ?? 'N/A'}',
+                              'Kanisa Number: ${memberData!['e_kanisa_number'] ?? 'N/A'}',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 14,
@@ -375,21 +376,7 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${memberData!['congregation'] ?? 'N/A'}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
-                                fontSize: 12,
-                              ),
-                            ),
-                            Text(
-                              '${memberData!['parish'] ?? 'N/A'}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
-                                fontSize: 12,
-                              ),
-                            ),
-                            Text(
-                              '${memberData!['presbytery'] ?? 'N/A'}, ${memberData!['region'] ?? 'N/A'}',
+                              'My Congregation: ${memberData!['congregation'] ?? 'N/A'}',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.8),
                                 fontSize: 12,
@@ -401,7 +388,7 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
 
                       const SizedBox(width: 16),
 
-                      // Right side - Large QR Code
+                      // QR Code
                       Container(
                         width: 220,
                         height: 220,
@@ -419,12 +406,10 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
                             backgroundColor: Colors.white,
                             foregroundColor: Colors.black,
                             errorStateBuilder: (cxt, err) {
-                              return Container(
-                                child: const Center(
-                                  child: Text(
-                                    'QR Error',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
+                              return const Center(
+                                child: Text(
+                                  'QR Error',
+                                  style: TextStyle(fontSize: 12),
                                 ),
                               );
                             },
@@ -451,13 +436,10 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                      ),
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 14,
                     ),
                   ],
                 ),
