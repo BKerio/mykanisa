@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pcea_church/screen/base_dashboard.dart';
 import 'package:pcea_church/screen/profile.dart';
-import 'package:pcea_church/components/settings.dart';
-import 'package:pcea_church/screen/elder_communications.dart';
+import 'package:pcea_church/screen/members.dart';
+import 'package:pcea_church/screen/elder_message_form.dart';
 
 class ElderDashboard extends BaseDashboard {
   const ElderDashboard({super.key});
@@ -17,6 +17,32 @@ class ElderDashboard extends BaseDashboard {
   @override
   List<DashboardCard> getDashboardCards(BuildContext context) {
     return [
+      DashboardCard(
+        icon: Icons.edit_note,
+        title: 'Communication Modules',
+        color: Color(0xFF0A1F44),
+        subtitle: 'Save message to database',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ElderMessageFormScreen(),
+            ),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.groups,
+        title: 'Congregation Members',
+        color: Colors.indigo,
+        subtitle: 'View your flock',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MembersScreen()),
+          );
+        },
+      ),
       DashboardCard(
         icon: Icons.person,
         title: 'Member Profile',
@@ -40,84 +66,6 @@ class ElderDashboard extends BaseDashboard {
             MaterialPageRoute(
               builder: (context) => const ElderContributionsScreen(),
             ),
-          );
-        },
-      ),
-      DashboardCard(
-        icon: Icons.business,
-        title: 'Church Board',
-        color: Colors.purple,
-        subtitle: 'Governance',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ChurchBoardScreen()),
-          );
-        },
-      ),
-      DashboardCard(
-        icon: Icons.assignment,
-        title: 'Reports',
-        color: Colors.orange,
-        subtitle: 'View analytics',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ElderReportsScreen()),
-          );
-        },
-      ),
-      DashboardCard(
-        icon: Icons.notifications,
-        title: 'Communications',
-        color: Colors.teal,
-        subtitle: 'Send & receive messages',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ElderCommunicationsScreen(),
-            ),
-          );
-        },
-      ),
-      DashboardCard(
-        icon: Icons.group_add,
-        title: 'Role Assignment',
-        color: Colors.brown,
-        subtitle: 'Assign roles',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ElderRoleAssignmentScreen(),
-            ),
-          );
-        },
-      ),
-      DashboardCard(
-        icon: Icons.church,
-        title: 'Congregation',
-        color: Colors.indigo,
-        subtitle: 'Oversee growth',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const CongregationOversightScreen(),
-            ),
-          );
-        },
-      ),
-      DashboardCard(
-        icon: Icons.settings,
-        title: 'Settings',
-        color: Colors.deepPurple,
-        subtitle: 'App preferences',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SettingsPage()),
           );
         },
       ),
@@ -265,70 +213,6 @@ class ElderReportsScreen extends StatelessWidget {
             SizedBox(height: 10),
             Text(
               'View church reports and analytics',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class ElderRoleAssignmentScreen extends StatelessWidget {
-  const ElderRoleAssignmentScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Role Assignment'),
-        backgroundColor: const Color(0xFF2E7D32),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.group_add, size: 100, color: Colors.grey),
-            SizedBox(height: 20),
-            Text(
-              'Role Assignment',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Assign roles to congregation members',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class CongregationOversightScreen extends StatelessWidget {
-  const CongregationOversightScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Congregation Oversight'),
-        backgroundColor: const Color(0xFF2E7D32),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.church, size: 100, color: Colors.grey),
-            SizedBox(height: 20),
-            Text(
-              'Congregation Oversight',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Oversee congregation growth and development',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ],

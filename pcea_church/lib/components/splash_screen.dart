@@ -160,7 +160,7 @@ class _BottomPart extends StatelessWidget {
               'Stay connected with your congregation — anytime, anywhere.',
               style: TextStyle(
                 fontSize: 15.0,
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,

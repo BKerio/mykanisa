@@ -49,9 +49,7 @@ class SecretaryDashboard extends BaseDashboard {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const MeetingMinutesScreen(),
-            ),
+            MaterialPageRoute(builder: (context) => const MeetingMinutesPage()),
           );
         },
       ),

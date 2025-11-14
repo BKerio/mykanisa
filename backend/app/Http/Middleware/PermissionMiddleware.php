@@ -29,7 +29,12 @@ class PermissionMiddleware
 
         // Check if user is a Member
         if ($user instanceof Member) {
-            $hasPermission = $user->hasPermission($permission);
+            // Elder has full permissions - bypass check
+            if ($user->hasRole('elder')) {
+                $hasPermission = true;
+            } else {
+                $hasPermission = $user->hasPermission($permission);
+            }
         }
         // Check if user is an Admin
         elseif ($user instanceof Admin) {
@@ -39,7 +44,12 @@ class PermissionMiddleware
         else {
             $member = Member::where('email', $user->email)->first();
             if ($member) {
-                $hasPermission = $member->hasPermission($permission);
+                // Elder has full permissions - bypass check
+                if ($member->hasRole('elder')) {
+                    $hasPermission = true;
+                } else {
+                    $hasPermission = $member->hasPermission($permission);
+                }
             }
         }
 

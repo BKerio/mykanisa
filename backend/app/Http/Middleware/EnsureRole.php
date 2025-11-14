@@ -35,12 +35,15 @@ class EnsureRole
         
         // Check if user is member
         if ($user instanceof Member) {
-            // Get scope from request parameters
-            $congregation = $request->input('congregation');
-            $parish = $request->input('parish');
-            $presbytery = $request->input('presbytery');
+            // Elder has full permissions - bypass scope checks
+            // Check role from members.role field (not member_roles table)
+            $memberRole = strtolower(trim($user->role ?? 'member'));
+            if ($memberRole === 'elder') {
+                return $next($request);
+            }
             
-            if (empty($roles) || $user->hasAnyRole($roles, $congregation, $parish, $presbytery)) {
+            // Check if member has any of the required roles from members.role field
+            if (empty($roles) || $user->hasAnyRole($roles)) {
                 return $next($request);
             }
         }

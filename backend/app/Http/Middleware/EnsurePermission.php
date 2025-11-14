@@ -27,6 +27,10 @@ class EnsurePermission
 
         // Check if user has any of the required permissions
         if ($user instanceof Admin || $user instanceof Member) {
+            // Elder has full permissions - bypass check
+            if ($user instanceof Member && $user->hasRole('elder')) {
+                return $next($request);
+            }
             if (empty($permissions) || $user->hasAnyPermission($permissions)) {
                 return $next($request);
             }

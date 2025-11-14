@@ -156,11 +156,18 @@ Route::middleware(['auth:sanctum', 'leadership'])->group(function(){
             $parish = $request->input('parish');
             $presbytery = $request->input('presbytery');
             
+            // Get role from members.role field (not member_roles table)
+            $memberRole = $user->role ?? 'member';
+            
+            // Get permissions for the role from roles table
+            $role = \App\Models\Role::where('slug', $memberRole)->first();
+            $permissions = $role ? $role->permissions()->get() : collect();
+            
             return response()->json([
                 'status' => 200,
                 'user' => $user,
-                'roles' => $user->rolesForScope($congregation, $parish, $presbytery)->get(),
-                'permissions' => $user->activeRoles()->with('permissions')->get()->pluck('permissions')->flatten()->unique('id'),
+                'roles' => [['slug' => $memberRole, 'name' => ucfirst($memberRole)]],
+                'permissions' => $permissions,
                 'scope' => compact('congregation', 'parish', 'presbytery')
             ]);
         });
@@ -190,7 +197,8 @@ Route::middleware(['auth:sanctum', 'leadership'])->group(function(){
                 $user = $request->user();
                 
                 // Check if user has permission to assign this role
-                if (!$user->hasPermission('assign_roles')) {
+                // Elder has full permissions - bypass check
+                if (!$user->hasRole('elder') && !$user->hasPermission('assign_roles')) {
                     return response()->json(['message' => 'Insufficient permissions'], 403);
                 }
 
@@ -252,11 +260,20 @@ Route::middleware(['auth:sanctum', 'role:elder'])->group(function(){
         Route::post('/members', [\App\Http\Controllers\Elder\MembersController::class, 'store']);
         Route::get('/members/{member}', [\App\Http\Controllers\Elder\MembersController::class, 'show']);
         Route::put('/members/{member}', [\App\Http\Controllers\Elder\MembersController::class, 'update']);
+        Route::delete('/members/{member}', [\App\Http\Controllers\Elder\MembersController::class, 'destroy']);
         
         Route::get('/contributions', [\App\Http\Controllers\Elder\ContributionsController::class, 'index']);
         Route::post('/contributions', [\App\Http\Controllers\Elder\ContributionsController::class, 'store']);
         Route::get('/contributions/{contribution}', [\App\Http\Controllers\Elder\ContributionsController::class, 'show']);
         Route::get('/contributions-statistics', [\App\Http\Controllers\Elder\ContributionsController::class, 'statistics']);
+        
+        // Messages/Announcements routes
+        Route::post('/messages', [\App\Http\Controllers\Elder\MessagesController::class, 'store']);
+        Route::get('/messages', [\App\Http\Controllers\Elder\MessagesController::class, 'index']);
+        Route::get('/messages/{announcement}', [\App\Http\Controllers\Elder\MessagesController::class, 'show']);
+        Route::post('/communications/broadcast', [\App\Http\Controllers\Elder\MessagesController::class, 'broadcast']);
+        Route::get('/messages-from-members', [\App\Http\Controllers\Elder\MessagesController::class, 'messagesFromMembers']);
+        Route::post('/messages/{announcement}/reply', [\App\Http\Controllers\Elder\MessagesController::class, 'replyToMember']);
     });
 });
 
@@ -412,6 +429,11 @@ Route::middleware(['auth:sanctum'])->group(function(){
         // Dashboard
         Route::get('/dashboard', [\App\Http\Controllers\Member\DashboardController::class, 'index']);
         Route::get('/notifications', [\App\Http\Controllers\Member\DashboardController::class, 'notifications']);
+        Route::post('/notifications/{announcement}/reply', [\App\Http\Controllers\Member\DashboardController::class, 'reply']);
+        Route::delete('/notifications/{announcement}', [\App\Http\Controllers\Member\DashboardController::class, 'delete']);
         Route::get('/events', [\App\Http\Controllers\Member\DashboardController::class, 'events']);
+        // Messages to elders
+        Route::get('/elders', [\App\Http\Controllers\Member\DashboardController::class, 'getElders']);
+        Route::post('/send-message-to-elder', [\App\Http\Controllers\Member\DashboardController::class, 'sendMessageToElder']);
     });
 });

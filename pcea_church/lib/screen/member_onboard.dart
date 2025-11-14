@@ -33,6 +33,8 @@ class _RegisterState extends State<Register> {
   final telephone = TextEditingController();
   final district = TextEditingController();
   final congregation = TextEditingController();
+  final regionController = TextEditingController();
+  final presbyteryController = TextEditingController();
   final password = TextEditingController();
   final passwordConfirm = TextEditingController();
 
@@ -55,12 +57,10 @@ class _RegisterState extends State<Register> {
   String selectedParishName = '';
 
   List<Map<String, dynamic>> regions = [];
-  List<Map<String, dynamic>> presbyteries = [];
   List<Map<String, dynamic>> parishes = [];
   List<Map<String, dynamic>> groups = [];
   final Set<int> selectedGroupIds = {};
   bool isLoadingRegions = true;
-  bool isLoadingPresbyteries = false;
   bool isLoadingParishes = false;
 
   // Dependents
@@ -83,17 +83,29 @@ class _RegisterState extends State<Register> {
   @override
   void initState() {
     super.initState();
-    loadRegions();
+    _initLocationData();
     loadGroups();
+  }
+
+  Future<void> _initLocationData() async {
+    await loadRegions();
+    if (!mounted) return;
+    await loadAllParishes();
   }
 
   @override
   void dispose() {
+    regionController.dispose();
+    presbyteryController.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
   Future<void> loadRegions() async {
+    if (!mounted) return;
+    setState(() {
+      isLoadingRegions = true;
+    });
     try {
       final res = await API().getRequest(
         url: Uri.parse('${Config.baseUrl}/regions'),
@@ -109,9 +121,11 @@ class _RegisterState extends State<Register> {
         }
       }
     } catch (e) {
-      setState(() {
-        isLoadingRegions = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoadingRegions = false;
+        });
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -140,81 +154,79 @@ class _RegisterState extends State<Register> {
     } catch (_) {}
   }
 
-  Future<void> loadPresbyteries(String regionId) async {
-    try {
-      setState(() {
-        isLoadingPresbyteries = true;
-        presbyteries = [];
-      });
+  Future<void> loadAllParishes() async {
+    if (!mounted) return;
+    regionController.clear();
+    presbyteryController.clear();
+    setState(() {
+      isLoadingParishes = true;
+      parishes = [];
+    });
 
-      final url = Uri.parse(
-        '${Config.baseUrl}/presbyteries?region_id=$regionId',
-      );
-      final res = await API().getRequest(url: url);
+    final List<Map<String, dynamic>> aggregatedParishes = [];
+    final regionsSnapshot = List<Map<String, dynamic>>.from(regions);
 
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        if (body['status'] == 200 && body['presbyteries'] != null) {
-          setState(() {
-            presbyteries = List<Map<String, dynamic>>.from(
-              body['presbyteries'],
+    for (final region in regionsSnapshot) {
+      final regionId = region['id']?.toString() ?? '';
+      if (regionId.isEmpty) continue;
+      try {
+        final presbyteriesResponse = await API().getRequest(
+          url: Uri.parse('${Config.baseUrl}/presbyteries?region_id=$regionId'),
+        );
+
+        if (presbyteriesResponse.statusCode != 200) continue;
+        final presbyteriesBody = jsonDecode(presbyteriesResponse.body);
+        final presbyteriesData = presbyteriesBody['presbyteries'];
+        if (presbyteriesBody['status'] != 200 || presbyteriesData == null) {
+          continue;
+        }
+
+        final presbyteriesList = List<Map<String, dynamic>>.from(
+          presbyteriesData,
+        );
+
+        for (final presbytery in presbyteriesList) {
+          final presbyteryId = presbytery['id']?.toString() ?? '';
+          if (presbyteryId.isEmpty) continue;
+
+          try {
+            final parishesResponse = await API().getRequest(
+              url: Uri.parse(
+                '${Config.baseUrl}/parishes?presbytery_id=$presbyteryId',
+              ),
             );
-            selectedPresbyteryId = '';
-            selectedPresbyteryName = '';
-            parishes = [];
-            selectedParishId = '';
-            selectedParishName = '';
-          });
+
+            if (parishesResponse.statusCode != 200) continue;
+            final parishesBody = jsonDecode(parishesResponse.body);
+            final parishesData = parishesBody['parishes'];
+            if (parishesBody['status'] != 200 || parishesData == null) {
+              continue;
+            }
+
+            final parishList = List<Map<String, dynamic>>.from(parishesData);
+            for (final parish in parishList) {
+              final enriched = Map<String, dynamic>.from(parish);
+              enriched['region_id'] = regionId;
+              enriched['region_name'] = region['name']?.toString() ?? '';
+              enriched['presbytery_id'] = presbyteryId;
+              enriched['presbytery_name'] =
+                  presbytery['name']?.toString() ?? '';
+              aggregatedParishes.add(enriched);
+            }
+          } catch (e) {
+            print('Error loading parishes for presbytery $presbyteryId: $e');
+          }
         }
-      }
-    } catch (e) {
-      print('Error loading presbyteries: $e');
-      setState(() {
-        presbyteries = [];
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoadingPresbyteries = false;
-        });
+      } catch (e) {
+        print('Error loading presbyteries for region $regionId: $e');
       }
     }
-  }
 
-  Future<void> loadParishes(String presbyteryId) async {
-    try {
-      setState(() {
-        isLoadingParishes = true;
-        parishes = [];
-      });
-
-      final url = Uri.parse(
-        '${Config.baseUrl}/parishes?presbytery_id=$presbyteryId',
-      );
-      final res = await API().getRequest(url: url);
-
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        if (body['status'] == 200 && body['parishes'] != null) {
-          setState(() {
-            parishes = List<Map<String, dynamic>>.from(body['parishes']);
-            selectedParishId = '';
-            selectedParishName = '';
-          });
-        }
-      }
-    } catch (e) {
-      print('Error loading parishes: $e');
-      setState(() {
-        parishes = [];
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoadingParishes = false;
-        });
-      }
-    }
+    if (!mounted) return;
+    setState(() {
+      parishes = aggregatedParishes;
+      isLoadingParishes = false;
+    });
   }
 
   void addDependent() {
@@ -763,7 +775,7 @@ class _RegisterState extends State<Register> {
                 profileImage != null
                     ? 'Tap to change photo'
                     : 'Upload your profile photo (Optional)',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: Colors.black),
               ),
             ],
           ),
@@ -974,7 +986,7 @@ class _RegisterState extends State<Register> {
                   Icon(
                     Icons.group,
                     color: selectedGroupIds.isEmpty
-                        ? Colors.grey
+                        ? Colors.black
                         : Theme.of(context).colorScheme.primary,
                     size: 20,
                   ),
@@ -1019,7 +1031,7 @@ class _RegisterState extends State<Register> {
                         if (selectedGroupIds.isEmpty)
                           const Text(
                             'None selected',
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                            style: TextStyle(color: Colors.black, fontSize: 14),
                           )
                         else
                           Wrap(
@@ -1084,118 +1096,15 @@ class _RegisterState extends State<Register> {
           subtitle: "Select your church details",
         ),
 
-        // Region (Searchable Picker)
-        GestureDetector(
-          onTap: isLoadingRegions ? null : _openRegionPicker,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.map, color: Colors.grey),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isLoadingRegions ? 'Loading regions...' : 'Region *',
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        selectedRegionName.isEmpty
-                            ? (isLoadingRegions
-                                  ? 'Please wait'
-                                  : 'Select Region (searchable)')
-                            : selectedRegionName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: locationTextColor(selectedRegionName),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.search, color: Colors.grey),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Presbytery (Searchable Picker)
-        GestureDetector(
-          onTap: (selectedRegionId.isEmpty || isLoadingPresbyteries)
-              ? null
-              : _openPresbyteryPicker,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.apartment, color: Colors.grey),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isLoadingPresbyteries
-                            ? 'Loading presbyteries...'
-                            : presbyteries.isEmpty
-                            ? 'Select a region first'
-                            : 'Presbytery *',
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        selectedPresbyteryName.isEmpty
-                            ? ((selectedRegionId.isEmpty ||
-                                      isLoadingPresbyteries)
-                                  ? 'Select a region first'
-                                  : 'Select Presbytery (searchable)')
-                            : selectedPresbyteryName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: locationTextColor(selectedPresbyteryName),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.search, color: Colors.grey),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
         // Parish (Searchable Picker)
         GestureDetector(
-          onTap: (selectedPresbyteryId.isEmpty || isLoadingParishes)
+          onTap: (isLoadingParishes || parishes.isEmpty)
               ? null
               : _openParishPicker,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: Colors.black),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -1210,7 +1119,7 @@ class _RegisterState extends State<Register> {
                         isLoadingParishes
                             ? 'Loading parishes...'
                             : parishes.isEmpty
-                            ? 'Select a presbytery first'
+                            ? 'No parishes available'
                             : 'Parish *',
                         style: const TextStyle(
                           color: Colors.black54,
@@ -1220,9 +1129,10 @@ class _RegisterState extends State<Register> {
                       const SizedBox(height: 2),
                       Text(
                         selectedParishName.isEmpty
-                            ? ((selectedPresbyteryId.isEmpty ||
-                                      isLoadingParishes)
-                                  ? 'Select a presbytery first'
+                            ? (isLoadingParishes
+                                  ? 'Please wait'
+                                  : parishes.isEmpty
+                                  ? 'No parishes found'
                                   : 'Select Parish (searchable)')
                             : selectedParishName,
                         style: TextStyle(
@@ -1235,7 +1145,14 @@ class _RegisterState extends State<Register> {
                     ],
                   ),
                 ),
-                const Icon(Icons.search, color: Colors.grey),
+                if (isLoadingParishes)
+                  const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  const Icon(Icons.search, color: Colors.grey),
               ],
             ),
           ),
@@ -1493,7 +1410,7 @@ class _RegisterState extends State<Register> {
           suffixIcon: IconButton(
             icon: Icon(
               _obscurePassword ? Icons.visibility : Icons.visibility_off,
-              color: Colors.grey,
+              color: Colors.black,
             ),
             onPressed: () =>
                 setState(() => _obscurePassword = !_obscurePassword),
@@ -1518,7 +1435,7 @@ class _RegisterState extends State<Register> {
           suffixIcon: IconButton(
             icon: Icon(
               _obscurePassword ? Icons.visibility : Icons.visibility_off,
-              color: Colors.grey,
+              color: Colors.black,
             ),
             onPressed: () =>
                 setState(() => _obscurePassword = !_obscurePassword),
@@ -1776,172 +1693,7 @@ class _RegisterState extends State<Register> {
     );
   }
 
-  void _openRegionPicker() {
-    List<Map<String, dynamic>> filtered = List<Map<String, dynamic>>.from(
-      regions,
-    );
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            ),
-            child: StatefulBuilder(
-              builder: (context, setLocal) {
-                void applyFilter(String q) {
-                  final ql = q.toLowerCase();
-                  setLocal(() {
-                    filtered = regions
-                        .where(
-                          (r) => (r['name']?.toString() ?? '')
-                              .toLowerCase()
-                              .contains(ql),
-                        )
-                        .toList();
-                  });
-                }
-
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.search),
-                          hintText: 'Search region...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onChanged: applyFilter,
-                      ),
-                    ),
-                    Flexible(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final r = filtered[index];
-                          return ListTile(
-                            leading: const Icon(Icons.place_outlined),
-                            title: Text(r['name']?.toString() ?? ''),
-                            onTap: () {
-                              setState(() {
-                                selectedRegionId = r['id'].toString();
-                                selectedRegionName =
-                                    r['name']?.toString() ?? '';
-                                presbyteries = [];
-                                parishes = [];
-                                selectedPresbyteryId = '';
-                                selectedPresbyteryName = '';
-                                selectedParishId = '';
-                                selectedParishName = '';
-                              });
-                              Navigator.of(context).pop();
-                              loadPresbyteries(selectedRegionId);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _openPresbyteryPicker() {
-    List<Map<String, dynamic>> filtered = List<Map<String, dynamic>>.from(
-      presbyteries,
-    );
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            ),
-            child: StatefulBuilder(
-              builder: (context, setLocal) {
-                void applyFilter(String q) {
-                  final ql = q.toLowerCase();
-                  setLocal(() {
-                    filtered = presbyteries
-                        .where(
-                          (p) => (p['name']?.toString() ?? '')
-                              .toLowerCase()
-                              .contains(ql),
-                        )
-                        .toList();
-                  });
-                }
-
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.search),
-                          hintText: 'Search presbytery...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onChanged: applyFilter,
-                      ),
-                    ),
-                    Flexible(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final p = filtered[index];
-                          return ListTile(
-                            leading: const Icon(Icons.apartment_outlined),
-                            title: Text(p['name']?.toString() ?? ''),
-                            onTap: () {
-                              setState(() {
-                                selectedPresbyteryId = p['id'].toString();
-                                selectedPresbyteryName =
-                                    p['name']?.toString() ?? '';
-                                parishes = [];
-                                selectedParishId = '';
-                                selectedParishName = '';
-                              });
-                              Navigator.of(context).pop();
-                              loadParishes(selectedPresbyteryId);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
+  // Region and presbytery pickers are no longer required now that parish selection auto-fills them.
 
   void _openParishPicker() {
     List<Map<String, dynamic>> filtered = List<Map<String, dynamic>>.from(
@@ -1964,13 +1716,19 @@ class _RegisterState extends State<Register> {
                 void applyFilter(String q) {
                   final ql = q.toLowerCase();
                   setLocal(() {
-                    filtered = parishes
-                        .where(
-                          (p) => (p['name']?.toString() ?? '')
-                              .toLowerCase()
-                              .contains(ql),
-                        )
-                        .toList();
+                    filtered = parishes.where((p) {
+                      final parishName = (p['name']?.toString() ?? '')
+                          .toLowerCase();
+                      final presbyteryName =
+                          (p['presbytery_name']?.toString() ?? '')
+                              .toLowerCase();
+                      final regionName = (p['region_name']?.toString() ?? '')
+                          .toLowerCase();
+
+                      return parishName.contains(ql) ||
+                          presbyteryName.contains(ql) ||
+                          regionName.contains(ql);
+                    }).toList();
                   });
                 }
 
@@ -1996,14 +1754,42 @@ class _RegisterState extends State<Register> {
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
                           final p = filtered[index];
+                          final parishId = p['id']?.toString() ?? '';
+                          final parishName = p['name']?.toString() ?? '';
+                          final presbyteryName =
+                              p['presbytery_name']?.toString() ?? '';
+                          final regionName = p['region_name']?.toString() ?? '';
+                          final subtitleParts = <String>[];
+                          if (presbyteryName.isNotEmpty) {
+                            subtitleParts.add(presbyteryName);
+                          }
+                          if (regionName.isNotEmpty) {
+                            subtitleParts.add(regionName);
+                          }
+                          final isSelected =
+                              parishId.isNotEmpty &&
+                              parishId == selectedParishId;
                           return ListTile(
                             leading: const Icon(Icons.church),
-                            title: Text(p['name']?.toString() ?? ''),
+                            title: Text(parishName),
+                            subtitle: subtitleParts.isEmpty
+                                ? null
+                                : Text(subtitleParts.join(' • ')),
+                            trailing: isSelected
+                                ? const Icon(Icons.check, color: Colors.green)
+                                : null,
                             onTap: () {
                               setState(() {
-                                selectedParishId = p['id'].toString();
-                                selectedParishName =
-                                    p['name']?.toString() ?? '';
+                                selectedParishId = parishId;
+                                selectedParishName = parishName;
+                                selectedPresbyteryId =
+                                    p['presbytery_id']?.toString() ?? '';
+                                selectedPresbyteryName = presbyteryName;
+                                selectedRegionId =
+                                    p['region_id']?.toString() ?? '';
+                                selectedRegionName = regionName;
+                                regionController.text = regionName;
+                                presbyteryController.text = presbyteryName;
                               });
                               Navigator.of(context).pop();
                             },

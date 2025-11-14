@@ -29,12 +29,16 @@ class RoleMiddleware
 
         // Check if user is a Member
         if ($user instanceof Member) {
-            // Get scope from request parameters or headers
-            $congregation = $request->input('congregation') ?? $request->header('X-Congregation');
-            $parish = $request->input('parish') ?? $request->header('X-Parish');
-            $presbytery = $request->input('presbytery') ?? $request->header('X-Presbytery');
-            
-            $hasRole = $user->hasRole($role, $congregation, $parish, $presbytery);
+            // Elder has full permissions - bypass scope checks
+            // Check role from members.role field (not member_roles table)
+            $memberRole = strtolower(trim($user->role ?? 'member'));
+            if ($memberRole === 'elder') {
+                $hasRole = true;
+            } else {
+                // Check if member has the required role from members.role field
+                $requiredRole = strtolower(trim($role));
+                $hasRole = $memberRole === $requiredRole;
+            }
         }
         // Check if user is an Admin
         elseif ($user instanceof Admin) {
@@ -44,11 +48,16 @@ class RoleMiddleware
         else {
             $member = Member::where('email', $user->email)->first();
             if ($member) {
-                $congregation = $request->input('congregation') ?? $request->header('X-Congregation');
-                $parish = $request->input('parish') ?? $request->header('X-Parish');
-                $presbytery = $request->input('presbytery') ?? $request->header('X-Presbytery');
-                
-                $hasRole = $member->hasRole($role, $congregation, $parish, $presbytery);
+                // Elder has full permissions - bypass scope checks
+                // Check role from members.role field (not member_roles table)
+                $memberRole = strtolower(trim($member->role ?? 'member'));
+                if ($memberRole === 'elder') {
+                    $hasRole = true;
+                } else {
+                    // Check if member has the required role from members.role field
+                    $requiredRole = strtolower(trim($role));
+                    $hasRole = $memberRole === $requiredRole;
+                }
             }
         }
 

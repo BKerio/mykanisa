@@ -7,6 +7,7 @@ use App\Models\Contribution;
 use App\Models\Dependency;
 use App\Models\Payment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
@@ -100,12 +101,305 @@ class DashboardController extends Controller
      */
     public function notifications(Request $request)
     {
-        // Notifications table has been removed
-        // Return empty notifications array
+        $user = $request->user();
+        
+        // Get member ID - handle both Member and User instances
+        $memberId = null;
+        $member = null;
+        $congregation = null;
+        
+        if ($user instanceof \App\Models\Member) {
+            $memberId = $user->id;
+            $member = $user;
+            $congregation = $user->congregation ?? null;
+        } else {
+            // User is from users table, find corresponding Member
+            $member = \App\Models\Member::where('email', $user->email)->first();
+            if (!$member) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Member record not found'
+                ], 404);
+            }
+            $memberId = $member->id;
+            $congregation = $member->congregation ?? null;
+        }
+        
+        // Get all announcements visible to this member
+        // Broadcast announcements are visible to all members
+        // Individual announcements are visible only to the recipient
+        // Exclude announcements deleted by this member
+        $announcements = \App\Models\Announcement::where(function($query) use ($memberId) {
+                $query->where('type', 'broadcast')
+                    ->orWhere(function($q) use ($memberId) {
+                        $q->where('type', 'individual')
+                          ->where('recipient_id', $memberId);
+                    });
+            })
+            ->where(function($query) use ($memberId) {
+                // Exclude announcements deleted by this member
+                $query->whereNull('deleted_by_member_id')
+                      ->orWhere('deleted_by_member_id', '!=', $memberId);
+            })
+            ->with(['sender' => function($query) {
+                $query->select('id', 'full_name', 'email', 'role');
+            }, 'replies.sender' => function($query) {
+                $query->select('id', 'full_name', 'email', 'role');
+            }])
+            ->orderBy('is_priority', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        // Mark unread announcements
+        foreach ($announcements as $announcement) {
+            if (!$announcement->isReadBy($memberId)) {
+                $announcement->markAsReadBy($memberId);
+            }
+        }
+
         return response()->json([
             'status' => 200,
-            'notifications' => [],
-            'message' => 'Notifications feature is currently unavailable'
+            'notifications' => $announcements->items(),
+            'pagination' => [
+                'current_page' => $announcements->currentPage(),
+                'last_page' => $announcements->lastPage(),
+                'per_page' => $announcements->perPage(),
+                'total' => $announcements->total(),
+            ],
+            'congregation' => $congregation,
+        ]);
+    }
+
+    /**
+     * Reply to an announcement
+     */
+    public function reply(Request $request, $announcementId)
+    {
+        $user = $request->user();
+        
+        // Get member ID
+        $memberId = null;
+        if ($user instanceof \App\Models\Member) {
+            $memberId = $user->id;
+        } else {
+            $member = \App\Models\Member::where('email', $user->email)->first();
+            if (!$member) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Member record not found'
+                ], 404);
+            }
+            $memberId = $member->id;
+        }
+
+        $validated = $request->validate([
+            'message' => 'required|string|max:5000',
+        ]);
+
+        // Find the original announcement
+        $originalAnnouncement = \App\Models\Announcement::findOrFail($announcementId);
+        
+        // Check if member can reply to this announcement
+        // Member can reply if:
+        // 1. It's a broadcast message (visible to all)
+        // 2. It's an individual message sent to them
+        // 3. It hasn't been deleted by them
+        $canReply = false;
+        if ($originalAnnouncement->type === 'broadcast') {
+            $canReply = true;
+        } elseif ($originalAnnouncement->type === 'individual' && 
+                  $originalAnnouncement->recipient_id == $memberId) {
+            $canReply = true;
+        }
+
+        if (!$canReply || $originalAnnouncement->isDeletedByMember($memberId)) {
+            return response()->json([
+                'status' => 403,
+                'message' => 'You cannot reply to this message'
+            ], 403);
+        }
+
+        // Get the sender (elder) of the original message
+        $elderId = $originalAnnouncement->sent_by;
+
+        // Create reply as a new announcement
+        $reply = \App\Models\Announcement::create([
+            'title' => 'Re: ' . $originalAnnouncement->title,
+            'message' => $validated['message'],
+            'type' => 'individual',
+            'sent_by' => $memberId, // Member is replying
+            'recipient_id' => $elderId, // Reply goes to the elder who sent the original
+            'reply_to' => $announcementId,
+            'is_priority' => false,
+        ]);
+
+        // Send SMS to elder if they have a phone number
+        try {
+            $elder = \App\Models\Member::find($elderId);
+            $memberName = $member->full_name ?? ($user instanceof \App\Models\Member ? $user->full_name : 'Member');
+            if ($elder && $elder->telephone) {
+                $smsService = app(\App\Services\SmsService::class);
+                $smsMessage = "Reply from {$memberName}\n\n";
+                $smsMessage .= "Re: {$originalAnnouncement->title}\n\n";
+                $smsMessage .= $validated['message'];
+                $smsService->sendSms($elder->telephone, $smsMessage);
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Failed to send SMS for reply', ['error' => $e->getMessage()]);
+        }
+
+        $reply->load(['sender' => function($query) {
+            $query->select('id', 'full_name', 'email', 'role');
+        }]);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Reply sent successfully',
+            'reply' => $reply,
+        ], 201);
+    }
+
+    /**
+     * Delete an announcement for a member (soft delete)
+     */
+    public function delete(Request $request, $announcementId)
+    {
+        $user = $request->user();
+        
+        // Get member ID
+        $memberId = null;
+        if ($user instanceof \App\Models\Member) {
+            $memberId = $user->id;
+        } else {
+            $member = \App\Models\Member::where('email', $user->email)->first();
+            if (!$member) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Member record not found'
+                ], 404);
+            }
+            $memberId = $member->id;
+        }
+
+        // Find the announcement
+        $announcement = \App\Models\Announcement::findOrFail($announcementId);
+        
+        // Check if member can delete this announcement
+        // Member can delete if:
+        // 1. It's a broadcast message (visible to all)
+        // 2. It's an individual message sent to them
+        $canDelete = false;
+        if ($announcement->type === 'broadcast') {
+            $canDelete = true;
+        } elseif ($announcement->type === 'individual' && 
+                  $announcement->recipient_id == $memberId) {
+            $canDelete = true;
+        }
+
+        if (!$canDelete) {
+            return response()->json([
+                'status' => 403,
+                'message' => 'You cannot delete this message'
+            ], 403);
+        }
+
+        // Mark as deleted by this member
+        $announcement->markAsDeletedByMember($memberId);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Message deleted successfully',
+        ]);
+    }
+
+    /**
+     * Send a new message to an elder
+     */
+    public function sendMessageToElder(Request $request)
+    {
+        $user = $request->user();
+        
+        // Get member ID
+        $memberId = null;
+        $member = null;
+        if ($user instanceof \App\Models\Member) {
+            $memberId = $user->id;
+            $member = $user;
+        } else {
+            $member = \App\Models\Member::where('email', $user->email)->first();
+            if (!$member) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Member record not found'
+                ], 404);
+            }
+            $memberId = $member->id;
+        }
+
+        $validated = $request->validate([
+            'elder_id' => 'required|exists:members,id',
+            'title' => 'required|string|max:255',
+            'message' => 'required|string|max:5000',
+        ]);
+
+        // Verify the recipient is an elder
+        $elder = \App\Models\Member::findOrFail($validated['elder_id']);
+        $elderRole = strtolower(trim($elder->role ?? 'member'));
+        if ($elderRole !== 'elder') {
+            return response()->json([
+                'status' => 403,
+                'message' => 'The recipient must be an elder'
+            ], 403);
+        }
+
+        // Create the message
+        $announcement = \App\Models\Announcement::create([
+            'title' => $validated['title'],
+            'message' => $validated['message'],
+            'type' => 'individual',
+            'sent_by' => $memberId, // Member is sending
+            'recipient_id' => $validated['elder_id'], // Elder is receiving
+            'is_priority' => false,
+        ]);
+
+        // Send SMS to elder if they have a phone number
+        try {
+            if ($elder->telephone) {
+                $smsService = app(\App\Services\SmsService::class);
+                $smsMessage = "Message from {$member->full_name}\n\n";
+                $smsMessage .= "Subject: {$validated['title']}\n\n";
+                $smsMessage .= $validated['message'];
+                $smsService->sendSms($elder->telephone, $smsMessage);
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Failed to send SMS for member message', ['error' => $e->getMessage()]);
+        }
+
+        $announcement->load(['sender' => function($query) {
+            $query->select('id', 'full_name', 'email', 'role');
+        }]);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Message sent to elder successfully',
+            'announcement' => $announcement,
+        ], 201);
+    }
+
+    /**
+     * Get list of elders (for member to select when sending message)
+     */
+    public function getElders(Request $request)
+    {
+        $elders = \App\Models\Member::where('role', 'elder')
+            ->where('is_active', true)
+            ->select('id', 'full_name', 'email', 'telephone', 'congregation', 'role')
+            ->orderBy('full_name')
+            ->get();
+
+        return response()->json([
+            'status' => 200,
+            'elders' => $elders,
         ]);
     }
 

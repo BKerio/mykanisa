@@ -4,42 +4,38 @@ namespace App\Http\Controllers\Elder;
 
 use App\Http\Controllers\Controller;
 use App\Models\Member;
+use App\Models\Group;
 use Illuminate\Http\Request;
 
 class MembersController extends Controller
 {
     /**
-     * Display a listing of members (elder can view all members in their scope)
+     * Display a listing of members (Elder has full admin access)
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        
-        // Get members based on elder's scope
+        $perPage = (int)($request->query('per_page', 20));
+        $search = trim((string)$request->query('q', ''));
+
         $query = Member::query();
-        
-        $congregation = $request->input('congregation');
-        $parish = $request->input('parish');
-        $presbytery = $request->input('presbytery');
-        
-        if ($congregation) {
-            $query->where('congregation', $congregation);
+        if ($search !== '') {
+            $query->where(function($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('e_kanisa_number', 'like', "%{$search}%")
+                  ->orWhere('telephone', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
         }
-        if ($parish) {
-            $query->where('parish', $parish);
-        }
-        if ($presbytery) {
-            $query->where('presbytery', $presbytery);
-        }
+
+        $members = $query->orderByDesc('id')->paginate($perPage);
         
-        $members = $query->with(['dependencies', 'contributions', 'groups'])
-            ->orderBy('full_name')
-            ->paginate(20);
-            
-        return response()->json([
-            'status' => 200,
-            'members' => $members
-        ]);
+        // Transform the data to include group names
+        $members->getCollection()->transform(function ($member) {
+            $member->group_names = $this->getGroupNames($member->groups);
+            return $member;
+        });
+
+        return $members;
     }
 
     /**
@@ -47,23 +43,9 @@ class MembersController extends Controller
      */
     public function show(Request $request, Member $member)
     {
-        $user = $request->user();
-        
-        // Check if elder can view this member based on scope
-        $congregation = $request->input('congregation');
-        $parish = $request->input('parish');
-        $presbytery = $request->input('presbytery');
-        
-        if ($congregation && $member->congregation !== $congregation) {
-            return response()->json(['message' => 'Access denied'], 403);
-        }
-        
-        $member->load(['dependencies', 'contributions', 'groups', 'roles']);
-        
-        return response()->json([
-            'status' => 200,
-            'member' => $member
-        ]);
+        // Elder has full permissions - fetch like admin
+        $member->group_names = $this->getGroupNames($member->groups);
+        return $member;
     }
 
     /**
@@ -102,32 +84,48 @@ class MembersController extends Controller
      */
     public function update(Request $request, Member $member)
     {
-        $user = $request->user();
-        
-        // Check if elder can update this member based on scope
-        $congregation = $request->input('congregation');
-        
-        if ($congregation && $member->congregation !== $congregation) {
-            return response()->json(['message' => 'Access denied'], 403);
-        }
-        
+        // Elder has full permissions - update like admin
         $validated = $request->validate([
             'full_name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:members,email,' . $member->id,
-            'telephone' => 'sometimes|string',
-            'marital_status' => 'sometimes|string',
-            'primary_school' => 'nullable|string',
-            'is_baptized' => 'sometimes|boolean',
-            'takes_holy_communion' => 'sometimes|boolean',
+            'telephone' => 'sometimes|string|max:50',
+            'email' => 'sometimes|email',
+            'role' => 'sometimes|string|in:member,deacon,elder,pastor,secretary,treasurer,choir_leader,youth_leader,chairman,sunday_school_teacher',
         ]);
-
         $member->update($validated);
-        
-        return response()->json([
-            'status' => 200,
-            'message' => 'Member updated successfully',
-            'member' => $member
-        ]);
+        $member->group_names = $this->getGroupNames($member->groups);
+        return $member;
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Member $member)
+    {
+        // Elder has full permissions - can delete members
+        $member->delete();
+        return response()->json(['message' => 'Deleted']);
+    }
+
+    /**
+     * Get group names from group IDs JSON string
+     */
+    private function getGroupNames($groupsJson)
+    {
+        if (empty($groupsJson)) {
+            return [];
+        }
+
+        try {
+            $groupIds = json_decode($groupsJson, true);
+            if (!is_array($groupIds)) {
+                return [];
+            }
+
+            $groups = Group::whereIn('id', $groupIds)->pluck('name')->toArray();
+            return $groups;
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 }
 

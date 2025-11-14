@@ -54,12 +54,7 @@ class ContributionsController extends Controller
     {
         $user = $request->user();
         
-        $congregation = $request->input('congregation');
-        
-        $member = $contribution->member;
-        if ($congregation && $member->congregation !== $congregation) {
-            return response()->json(['message' => 'Access denied'], 403);
-        }
+        // Elder has full permissions - no scope restrictions
         
         $contribution->load(['member', 'member.dependencies']);
         
@@ -84,11 +79,8 @@ class ContributionsController extends Controller
         ]);
 
         $member = Member::findOrFail($validated['member_id']);
-        $congregation = $request->input('congregation');
         
-        if ($congregation && $member->congregation !== $congregation) {
-            return response()->json(['message' => 'Access denied'], 403);
-        }
+        // Elder has full permissions - no scope restrictions
         
         $contribution = Contribution::create($validated);
         $contribution->load('member');

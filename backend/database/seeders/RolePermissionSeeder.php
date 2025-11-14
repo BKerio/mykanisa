@@ -113,16 +113,8 @@ class RolePermissionSeeder extends Seeder
                 'slug' => 'elder',
                 'description' => 'Church elder with oversight responsibilities',
                 'is_system_role' => true,
-                'hierarchy_level' => 70,
-                'permissions' => [
-                    'view_members', 'create_members', 'update_members',
-                    'view_contributions', 'create_contributions',
-                    'view_roles', 'assign_roles',
-                    'view_congregations',
-                    'view_reports',
-                    'view_financial',
-                    'send_notifications'
-                ]
+                'hierarchy_level' => 80,
+                'permissions' => Permission::pluck('slug')->toArray() // Full permissions
             ],
             [
                 'name' => 'Deacon',

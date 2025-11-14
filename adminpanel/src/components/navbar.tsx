@@ -114,6 +114,7 @@ const Navbar = ({ user }: NavbarProps) => {
     <img
       src={NavLogo}
       alt="My Kanisa Logo"
+      toggable={false}
       className={`h-${scrolled ? '12' : '14'} w-auto transition-all duration-300 drop-shadow-md`}
     />
   

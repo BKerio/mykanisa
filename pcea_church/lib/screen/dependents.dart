@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pcea_church/config/server.dart';
 import 'dart:convert';
-
 import 'package:pcea_church/method/api.dart';
 import 'package:pcea_church/screen/my_dependents.dart';
 
@@ -104,9 +103,7 @@ class _DependentsScreenState extends State<DependentsScreen> {
       context,
     ).push(MaterialPageRoute(builder: (_) => const DependentFormScreen()));
 
-    if (result == true) {
-      fetchDependents(); // Refresh the list
-    }
+    if (result == true) fetchDependents();
   }
 
   Future<void> _navigateToEditDependent(Dependent dependent) async {
@@ -116,61 +113,51 @@ class _DependentsScreenState extends State<DependentsScreen> {
       ),
     );
 
-    if (result == true) {
-      fetchDependents(); // Refresh the list
-    }
+    if (result == true) fetchDependents();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: const Text('My Dependents'),
-        backgroundColor: Colors.grey.shade100,
-        foregroundColor: Colors.black87,
+        title: const Text(
+          'My Dependents',
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: Colors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black87),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToAddDependent,
-        backgroundColor: Colors.grey.shade200,
-        foregroundColor: Colors.black87,
+        backgroundColor: Colors.teal.shade600,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text("Add Dependent"),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.grey.shade200, Colors.white],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-                ),
-              )
-            : errorMessage != null
-            ? _buildErrorWidget()
-            : dependents.isEmpty
-            ? _buildEmptyWidget()
-            : _buildDependentsList(),
-      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+          ? _buildErrorWidget()
+          : dependents.isEmpty
+          ? _buildEmptyWidget()
+          : _buildDependentsList(),
     );
   }
 
-  Widget _buildErrorWidget() {
-    return Center(
+  Widget _buildErrorWidget() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24.0),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline, size: 80, color: Colors.red.shade300),
-          const SizedBox(height: 20),
+          Icon(Icons.error_outline, color: Colors.red.shade400, size: 80),
+          const SizedBox(height: 16),
           const Text(
             'Error Loading Dependents',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
@@ -181,270 +168,258 @@ class _DependentsScreenState extends State<DependentsScreen> {
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 16, color: Colors.black54),
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 20),
           ElevatedButton.icon(
-            onPressed: fetchDependents,
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black87,
+              backgroundColor: Colors.teal.shade600,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: fetchDependents,
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _buildEmptyWidget() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.family_restroom, size: 90, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          const Text(
+            'No Dependents Found',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'You have not registered any dependents yet.\nTap below to add one.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.black54),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _navigateToAddDependent,
+            icon: const Icon(Icons.add),
+            label: const Text('Add Dependent'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildEmptyWidget() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.family_restroom, size: 100, color: Colors.grey.shade400),
-            const SizedBox(height: 20),
-            const Text(
-              'No Dependents Found',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'You haven\'t registered any dependents yet.\nTap the button below to add one.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.black54),
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton.icon(
-              onPressed: _navigateToAddDependent,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Dependent'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black87,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 30,
-                  vertical: 15,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    ),
+  );
 
   Widget _buildDependentsList() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.family_restroom,
-                color: Colors.black87,
-                size: 30,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Your Dependents (${dependents.length})',
-                style: const TextStyle(
-                  color: Colors.black87,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: dependents.length,
-            itemBuilder: (context, index) {
-              final dependent = dependents[index];
-              return _buildDependentCard(dependent);
-            },
-          ),
-        ),
-      ],
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: dependents.length,
+      itemBuilder: (context, index) {
+        final dependent = dependents[index];
+        return _buildDependentCard(dependent);
+      },
     );
   }
 
   Widget _buildDependentCard(Dependent dependent) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 15),
-      elevation: 4,
-      shadowColor: Colors.black26,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Colors.grey.shade300,
-                  child: Text(
-                    dependent.name[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dependent.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Text(
-                        'Age: ${dependent.age} years',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Chip(
-                  label: Text('Born ${dependent.yearOfBirth}'),
-                  backgroundColor: Colors.grey.shade100,
-                  labelStyle: const TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            if (dependent.birthCertNumber != null)
-              _buildInfoRow(
-                Icons.badge,
-                'Birth Certificate',
-                dependent.birthCertNumber!,
-              ),
-            if (dependent.school != null && dependent.school!.isNotEmpty)
-              _buildInfoRow(Icons.school, 'School', dependent.school!),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatusChip(
-                    'Baptized',
-                    dependent.isBaptized,
-                    Icons.water_drop,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildStatusChip(
-                    'Holy Communion',
-                    dependent.takesHolyCommunion,
-                    Icons.local_drink,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _navigateToEditDependent(dependent),
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Edit Dependent'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal.shade50,
-                  foregroundColor: Colors.teal.shade700,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: Colors.black54),
-          const SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusChip(String label, bool status, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: status ? Colors.grey.shade200 : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: status ? Colors.black45 : Colors.black26,
-          width: 1,
+        gradient: LinearGradient(
+          colors: [Colors.teal.shade50, Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 16, color: status ? Colors.black87 : Colors.black54),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: status ? Colors.black87 : Colors.black54,
-            ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.teal.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
+        ),
+        leading: CircleAvatar(
+          radius: 28,
+          backgroundColor: Colors.teal.shade100,
+          child: Text(
+            dependent.name[0].toUpperCase(),
+            style: const TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
+          ),
+        ),
+        title: Text(
+          dependent.name,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+            color: Colors.black87,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Age: ${dependent.age} years',
+                style: const TextStyle(color: Colors.black54, fontSize: 14),
+              ),
+              if (dependent.school != null && dependent.school!.isNotEmpty)
+                Text(
+                  'School: ${dependent.school}',
+                  style: const TextStyle(color: Colors.black54, fontSize: 14),
+                ),
+            ],
+          ),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.edit, color: Colors.teal),
+          onPressed: () => _navigateToEditDependent(dependent),
+          tooltip: 'Edit Dependent',
+        ),
+        onTap: () => _showDependentDetails(dependent),
+      ),
+    );
+  }
+
+  void _showDependentDetails(Dependent dependent) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.only(
+            top: 24,
+            left: 20,
+            right: 20,
+            bottom: 40,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: 4,
+                width: 50,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.teal.shade100,
+                child: Text(
+                  dependent.name[0].toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                dependent.name,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Age: ${dependent.age} years',
+                style: const TextStyle(color: Colors.black54, fontSize: 15),
+              ),
+              const Divider(height: 30),
+              _buildInfoTile(
+                Icons.badge,
+                "Birth Certificate",
+                dependent.birthCertNumber ?? 'Not provided',
+              ),
+              _buildInfoTile(
+                Icons.school,
+                "School",
+                dependent.school ?? 'Not specified',
+              ),
+              _buildInfoTile(
+                Icons.water_drop,
+                "Baptized",
+                dependent.isBaptized ? "Yes" : "No",
+              ),
+              _buildInfoTile(
+                Icons.local_drink,
+                "Holy Communion",
+                dependent.takesHolyCommunion ? "Yes" : "No",
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => _navigateToEditDependent(dependent),
+                icon: const Icon(Icons.edit),
+                label: const Text("Edit Dependent"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoTile(IconData icon, String label, String value) {
+    return ListTile(
+      dense: true,
+      leading: Icon(icon, color: Colors.teal.shade600),
+      title: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+      ),
+      subtitle: Text(
+        value,
+        style: const TextStyle(color: Colors.black87, fontSize: 14),
       ),
     );
   }

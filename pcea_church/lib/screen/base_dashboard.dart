@@ -6,8 +6,8 @@ import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 import 'package:pcea_church/screen/add_dependents.dart';
 import 'package:pcea_church/screen/login.dart';
+import 'package:pcea_church/screen/member_messages.dart';
 import 'package:pcea_church/screen/payments.dart';
-import 'package:pcea_church/screen/profile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 abstract class BaseDashboard extends StatefulWidget {
@@ -174,7 +174,7 @@ class BaseDashboardState extends State<BaseDashboard> {
       imageUrl = baseUrl + (imageUrl.startsWith('/') ? imageUrl : '/$imageUrl');
     }
 
-    print('Building profile image with URL: $imageUrl');
+    // print('Building profile image with URL: $imageUrl');
 
     return Container(
       height: imageSize,
@@ -205,7 +205,7 @@ class BaseDashboardState extends State<BaseDashboard> {
           },
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) {
-              print('Profile image loaded successfully');
+              //print('Profile image loaded successfully');
               return child;
             }
             return SizedBox(
@@ -512,7 +512,7 @@ class BaseDashboardState extends State<BaseDashboard> {
       case 0:
         return _buildDashboard();
       case 1:
-        return const ProfileScreen();
+        return const MemberMessagesScreen();
       case 2:
         return const DependentsScreen();
       case 3:
@@ -668,8 +668,8 @@ class BaseDashboardState extends State<BaseDashboard> {
                           children: [
                             const Icon(
                               Icons.email_rounded,
-                              size: 18,
-                              color: Colors.black54,
+                              size: 25,
+                              color: Colors.black,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -690,9 +690,9 @@ class BaseDashboardState extends State<BaseDashboard> {
                         Row(
                           children: [
                             const Icon(
-                              Icons.volunteer_activism_rounded,
-                              size: 18,
-                              color: Colors.black54,
+                              Icons.person_rounded,
+                              size: 25,
+                              color: Colors.black,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -718,21 +718,17 @@ class BaseDashboardState extends State<BaseDashboard> {
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: Color(0xFFF1F2F3),
+                            color: const Color(0xFFF1F2F3),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: Colors.teal.shade200,
+                              color: const Color(0xFF0A1F44),
                               width: 1,
                             ),
                           ),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.account_box_rounded,
-                                color: Color(0xFFF1F2F3),
-                                size: 22,
-                              ),
-                              const SizedBox(width: 10),
+                              // TITLE – STARTS FROM EDGE
                               const Text(
                                 'My Kanisa No:',
                                 style: TextStyle(
@@ -741,25 +737,33 @@ class BaseDashboardState extends State<BaseDashboard> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 350),
-                                transitionBuilder: (child, anim) =>
-                                    FadeTransition(opacity: anim, child: child),
-                                child: Text(
-                                  isEkanisaVisible
-                                      ? getEkanisaNumber()
-                                      : maskEkanisaNumber(),
-                                  key: ValueKey<bool>(isEkanisaVisible),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontFamily: 'monospace',
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black,
+
+                              // EXPANDED NUMBER — NO OVERFLOW
+                              Expanded(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 350),
+                                  transitionBuilder: (child, anim) =>
+                                      FadeTransition(
+                                        opacity: anim,
+                                        child: child,
+                                      ),
+                                  child: Text(
+                                    isEkanisaVisible
+                                        ? getEkanisaNumber()
+                                        : maskEkanisaNumber(),
+                                    key: ValueKey<bool>(isEkanisaVisible),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ),
                               ),
-                              const Spacer(),
+
+                              // VISIBILITY TOGGLE
                               GestureDetector(
                                 onTap: () {
                                   setState(() {
@@ -778,7 +782,7 @@ class BaseDashboardState extends State<BaseDashboard> {
                                         ? Icons.visibility_off_rounded
                                         : Icons.visibility_rounded,
                                     size: 20,
-                                    color: Colors.teal,
+                                    color: Color(0xFF0A1F44),
                                   ),
                                 ),
                               ),

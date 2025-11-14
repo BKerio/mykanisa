@@ -160,7 +160,8 @@ class _PledgesPageState extends State<PledgesPage> {
       final List<Map<String, dynamic>> pledgesToCreate = [];
 
       for (final accountType in _accountTypes) {
-        final amount = double.tryParse(_pledgeAmountCtrls[accountType]!.text.trim()) ?? 0;
+        final amount =
+            double.tryParse(_pledgeAmountCtrls[accountType]!.text.trim()) ?? 0;
         if (amount > 0) {
           final pledgeData = <String, dynamic>{
             'account_type': accountType,
@@ -174,7 +175,9 @@ class _PledgesPageState extends State<PledgesPage> {
 
           final targetDate = _targetDates[accountType];
           if (targetDate != null) {
-            pledgeData['target_date'] = DateFormat('yyyy-MM-dd').format(targetDate);
+            pledgeData['target_date'] = DateFormat(
+              'yyyy-MM-dd',
+            ).format(targetDate);
           }
 
           pledgesToCreate.add(pledgeData);
@@ -199,7 +202,9 @@ class _PledgesPageState extends State<PledgesPage> {
           }
         } catch (e) {
           failCount++;
-          debugPrint('Error creating pledge for ${pledgeData['account_type']}: $e');
+          debugPrint(
+            'Error creating pledge for ${pledgeData['account_type']}: $e',
+          );
         }
       }
 
@@ -229,10 +234,7 @@ class _PledgesPageState extends State<PledgesPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -248,7 +250,7 @@ class _PledgesPageState extends State<PledgesPage> {
     final isEditing = pledge != null;
     final formKey = GlobalKey<FormState>();
     final accountTypeCtrl = TextEditingController(
-      text: isEditing ? pledge!['account_type'] : '',
+      text: isEditing ? pledge['account_type'] : '',
     );
     final amountCtrl = TextEditingController(
       text: pledge != null
@@ -273,7 +275,7 @@ class _PledgesPageState extends State<PledgesPage> {
 
     // For dropdown state - use a list to maintain state across rebuilds
     final dropdownState = [
-      isEditing ? pledge!['account_type'] as String? : null,
+      isEditing ? pledge['account_type'] as String? : null,
     ];
 
     await showDialog(
@@ -419,7 +421,7 @@ class _PledgesPageState extends State<PledgesPage> {
 
                       final res = await API().putRequest(
                         url: Uri.parse(
-                          '${Config.baseUrl}/member/pledges/${pledge!['id']}',
+                          '${Config.baseUrl}/member/pledges/${pledge['id']}',
                         ),
                         data: updateData,
                       );
@@ -644,25 +646,21 @@ class _PledgesPageState extends State<PledgesPage> {
             // Header
             Column(
               children: [
-                const Icon(
-                  Icons.flag,
-                  size: 120,
-                  color: Color(0xFF0A1F44),
-                ),
+                const Icon(Icons.flag, size: 120, color: Color(0xFF0A1F44)),
                 const SizedBox(height: 10),
                 Text(
                   "Create Your Pledges",
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   "Pledge to multiple accounts at once",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.black54,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.black54),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -673,9 +671,9 @@ class _PledgesPageState extends State<PledgesPage> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Select accounts to pledge to:',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 8),
@@ -693,7 +691,10 @@ class _PledgesPageState extends State<PledgesPage> {
                 elevation: 2,
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ExpansionTile(
-                  leading: Icon(_iconForType(type), color: const Color(0xFF0A1F44)),
+                  leading: Icon(
+                    _iconForType(type),
+                    color: const Color(0xFF0A1F44),
+                  ),
                   title: Text(
                     type,
                     style: const TextStyle(
@@ -732,7 +733,9 @@ class _PledgesPageState extends State<PledgesPage> {
                             onChanged: (_) => setState(() {}),
                             validator: (v) {
                               final amount = double.tryParse(v ?? '') ?? 0;
-                              if (amount < 0) return 'Amount cannot be negative';
+                              if (amount < 0) {
+                                return 'Amount cannot be negative';
+                              }
                               return null;
                             },
                           ),
@@ -769,8 +772,11 @@ class _PledgesPageState extends State<PledgesPage> {
                             onTap: () async {
                               final date = await showDatePicker(
                                 context: context,
-                                initialDate: targetDate ??
-                                    DateTime.now().add(const Duration(days: 30)),
+                                initialDate:
+                                    targetDate ??
+                                    DateTime.now().add(
+                                      const Duration(days: 30),
+                                    ),
                                 firstDate: DateTime.now(),
                                 lastDate: DateTime.now().add(
                                   const Duration(days: 365 * 2),
@@ -810,10 +816,7 @@ class _PledgesPageState extends State<PledgesPage> {
                   const SizedBox(width: 10),
                   const Text(
                     'Total Pledge Amount:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),
                   Text(

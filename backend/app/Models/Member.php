@@ -106,39 +106,54 @@ class Member extends Model
 
     /**
      * Check if member has a specific role
+     * Uses the 'role' field in members table instead of member_roles relationship
      */
     public function hasRole($role, $congregation = null, $parish = null, $presbytery = null)
     {
-        if (is_string($role)) {
-            $role = Role::where('slug', $role)->first();
+        // Elder has full permissions - always return true if checking for any role
+        // Check if member has elder role in the role field first
+        $memberRole = strtolower(trim($this->role ?? 'member'));
+        
+        if ($memberRole === 'elder') {
+            return true;
         }
-
-        if (!$role) {
+        
+        // Normalize role comparison
+        if (is_string($role)) {
+            $roleSlug = strtolower(trim($role));
+        } elseif (is_object($role) && isset($role->slug)) {
+            $roleSlug = strtolower(trim($role->slug));
+        } else {
             return false;
         }
 
-        $query = $this->activeRoles()->where('roles.id', $role->id);
-
-        if ($congregation) {
-            $query->wherePivot('congregation', $congregation);
-        }
-        if ($parish) {
-            $query->wherePivot('parish', $parish);
-        }
-        if ($presbytery) {
-            $query->wherePivot('presbytery', $presbytery);
-        }
-
-        return $query->exists();
+        // Check if member's role matches (case-insensitive)
+        return $memberRole === $roleSlug;
     }
 
     /**
      * Check if member has any of the given roles
+     * Uses the 'role' field in members table instead of member_roles relationship
      */
     public function hasAnyRole(array $roles, $congregation = null, $parish = null, $presbytery = null)
     {
+        // Elder has full permissions - always return true
+        $memberRole = strtolower(trim($this->role ?? 'member'));
+        if ($memberRole === 'elder') {
+            return true;
+        }
+        
+        // Normalize member role and check against provided roles
         foreach ($roles as $role) {
-            if ($this->hasRole($role, $congregation, $parish, $presbytery)) {
+            if (is_string($role)) {
+                $roleSlug = strtolower(trim($role));
+            } elseif (is_object($role) && isset($role->slug)) {
+                $roleSlug = strtolower(trim($role->slug));
+            } else {
+                continue;
+            }
+            
+            if ($memberRole === $roleSlug) {
                 return true;
             }
         }
@@ -147,16 +162,29 @@ class Member extends Model
 
     /**
      * Check if member has a specific permission
+     * Elder has full permissions - always returns true for elder role
      */
     public function hasPermission($permission)
     {
-        return $this->activeRoles()->whereHas('permissions', function($query) use ($permission) {
-            if (is_string($permission)) {
-                $query->where('slug', $permission);
-            } else {
-                $query->where('permissions.id', $permission->id);
-            }
-        })->exists();
+        // Elder has full permissions - always return true
+        $memberRole = strtolower(trim($this->role ?? 'member'));
+        if ($memberRole === 'elder') {
+            return true;
+        }
+        
+        // For other roles, check permissions through role_permissions table
+        // First get the member's role from members.role field
+        $role = Role::where('slug', $memberRole)->first();
+        if (!$role) {
+            return false;
+        }
+        
+        // Check if role has the permission
+        if (is_string($permission)) {
+            return $role->permissions()->where('slug', $permission)->exists();
+        } else {
+            return $role->permissions()->where('permissions.id', $permission->id)->exists();
+        }
     }
 
     /**
@@ -164,6 +192,11 @@ class Member extends Model
      */
     public function hasAnyPermission(array $permissions)
     {
+        // Elder has full permissions - always return true
+        if ($this->hasRole('elder')) {
+            return true;
+        }
+        
         foreach ($permissions as $permission) {
             if ($this->hasPermission($permission)) {
                 return true;
@@ -249,18 +282,22 @@ class Member extends Model
 
     /**
      * Get the highest hierarchy level role for this member
+     * Uses the 'role' field in members table instead of member_roles relationship
      */
     public function getHighestRoleLevel()
     {
-        return $this->activeRoles()->max('hierarchy_level') ?? 0;
+        $memberRole = strtolower(trim($this->role ?? 'member'));
+        $role = Role::where('slug', $memberRole)->first();
+        return $role ? $role->hierarchy_level : 0;
     }
 
     /**
      * Check if member is a leader (has any leadership role)
+     * Uses the 'role' field in members table instead of member_roles relationship
      */
     public function isLeader($congregation = null, $parish = null, $presbytery = null)
     {
         $leadershipRoles = ['pastor', 'elder', 'deacon', 'chairman', 'secretary', 'treasurer'];
-        return $this->hasAnyRole($leadershipRoles, $congregation, $parish, $presbytery);
+        return $this->hasAnyRole($leadershipRoles);
     }
 }

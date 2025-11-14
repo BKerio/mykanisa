@@ -20,11 +20,18 @@ class AuthController extends Controller
             return response()->json(['message' => 'Access denied. Elder role required.'], 403);
         }
 
+        // Get role from members.role field (not member_roles table)
+        $memberRole = $user->role ?? 'member';
+        
+        // Get permissions for the role from roles table
+        $role = \App\Models\Role::where('slug', $memberRole)->first();
+        $permissions = $role ? $role->permissions()->get() : collect();
+        
         return response()->json([
             'status' => 200,
             'user' => $user,
-            'roles' => $user->activeRoles()->get(),
-            'permissions' => $user->activeRoles()->with('permissions')->get()->pluck('permissions')->flatten()->unique('id'),
+            'roles' => [['slug' => $memberRole, 'name' => ucfirst($memberRole)]],
+            'permissions' => $permissions,
         ]);
     }
 

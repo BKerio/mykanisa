@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:pcea_church/screen/account_summary.dart';
-import 'package:pcea_church/screen/add_dependents.dart';
 import 'package:pcea_church/screen/base_dashboard.dart';
 import 'package:pcea_church/screen/my_groups.dart';
 import 'package:pcea_church/screen/payments.dart';
@@ -33,14 +32,16 @@ class MemberDashboard extends BaseDashboard {
         },
       ),
       DashboardCard(
-        icon: Icons.group,
-        title: 'My Dependents',
-        color: Colors.deepPurple,
-        subtitle: 'Manage family',
+        icon: Icons.messenger,
+        title: 'Messages',
+        color: Colors.teal,
+        subtitle: 'View messages from elders',
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const DependentsScreen()),
+            MaterialPageRoute(
+              builder: (context) => const MemberMessagesScreen(),
+            ),
           );
         },
       ),
@@ -69,9 +70,9 @@ class MemberDashboard extends BaseDashboard {
         },
       ),
       DashboardCard(
-        icon: Icons.wallet_rounded,
+        icon: Icons.groups,
         title: 'Church groups',
-        color: Colors.green,
+        color: Color(0xFF0A1F44),
         subtitle: 'Manage your church groups',
         onTap: () {
           Navigator.push(
@@ -92,18 +93,6 @@ class MemberDashboard extends BaseDashboard {
           );
         },
       ),
-      DashboardCard(
-        icon: Icons.notifications,
-        title: 'Messages',
-        color: Colors.teal,
-        subtitle: 'View messages from elders',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MemberMessagesScreen()),
-          );
-        },
-      ),
     ];
   }
 
@@ -111,7 +100,10 @@ class MemberDashboard extends BaseDashboard {
   List<BottomNavigationBarItem> getBottomNavItems() {
     return const [
       BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-      BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.message_rounded),
+        label: "Messages",
+      ),
       BottomNavigationBarItem(icon: Icon(Icons.group), label: "Dependents"),
       BottomNavigationBarItem(
         icon: Icon(Icons.account_balance_wallet),
