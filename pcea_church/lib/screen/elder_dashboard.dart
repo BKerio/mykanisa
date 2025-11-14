@@ -18,7 +18,7 @@ class ElderDashboard extends BaseDashboard {
   List<DashboardCard> getDashboardCards(BuildContext context) {
     return [
       DashboardCard(
-        icon: Icons.edit_note,
+        icon: Icons.message_rounded,
         title: 'Communication Modules',
         color: Color(0xFF0A1F44),
         subtitle: 'Save message to database',
@@ -44,10 +44,10 @@ class ElderDashboard extends BaseDashboard {
         },
       ),
       DashboardCard(
-        icon: Icons.person,
-        title: 'Member Profile',
-        color: Colors.blue,
-        subtitle: 'View & edit profile',
+        icon: Icons.event,
+        title: 'Manage Events & Ministries',
+        color: Colors.orange,
+        subtitle: 'Oversee church activities',
         onTap: () {
           Navigator.push(
             context,
@@ -56,8 +56,8 @@ class ElderDashboard extends BaseDashboard {
         },
       ),
       DashboardCard(
-        icon: Icons.account_balance_wallet,
-        title: 'Contributions',
+        icon: Icons.wallet_giftcard_rounded,
+        title: ' Church Contributions',
         color: Colors.green,
         subtitle: 'View records',
         onTap: () {

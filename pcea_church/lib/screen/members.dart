@@ -324,8 +324,7 @@ class _MembersScreenState extends State<MembersScreen> {
                                 },
                               )
                             : null,
-                        hintText:
-                            'Search by name, e-kanisa number, email, or phone...',
+                        hintText: 'Search by name, kanisa number',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -411,12 +410,12 @@ class _MemberTile extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 26,
-              backgroundColor: const Color(0xFF2E7D32).withOpacity(0.15),
+              backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
               child: Text(
                 _initials(fullName),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2E7D32),
+                  color: Color(0xFF0A1F44),
                 ),
               ),
             ),
@@ -425,48 +424,69 @@ class _MemberTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // FULL NAME
                   Text(
                     fullName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 17,
                       fontWeight: FontWeight.w700,
+                      color: Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
+
+                  const SizedBox(height: 6),
+
+                  // ROLE + KANISA NUMBER
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         role,
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.black54,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (eKanisaNumber.isNotEmpty) ...[
-                        const Text(
-                          ' • ',
-                          style: TextStyle(fontSize: 13, color: Colors.black54),
+                      if (eKanisaNumber.isNotEmpty)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              "• ",
+                              style: TextStyle(color: Colors.black45),
+                            ),
+                            const Text(
+                              "Kanisa No:",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              eKanisaNumber,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          "Member's Kanisa No:",
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black54,
-                          ),
-                        ),
-                        Text(
-                          "$eKanisaNumber",
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
+
+                  // EMAIL ROW
                   if (email.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(
                           Icons.email_outlined,
@@ -477,6 +497,8 @@ class _MemberTile extends StatelessWidget {
                         Expanded(
                           child: Text(
                             email,
+                            overflow: TextOverflow.fade,
+                            softWrap: true,
                             style: const TextStyle(
                               fontSize: 13,
                               color: Colors.black87,
@@ -486,8 +508,10 @@ class _MemberTile extends StatelessWidget {
                       ],
                     ),
                   ],
+
+                  // PHONE ROW
                   if (phone.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         const Icon(
@@ -496,18 +520,22 @@ class _MemberTile extends StatelessWidget {
                           color: Colors.black45,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          phone,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black87,
+                        Expanded(
+                          child: Text(
+                            phone,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ],
+
+                  // GROUPS ROW
                   if (groupText.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -520,6 +548,7 @@ class _MemberTile extends StatelessWidget {
                         Expanded(
                           child: Text(
                             groupText,
+                            softWrap: true,
                             style: const TextStyle(
                               fontSize: 13,
                               color: Colors.black87,

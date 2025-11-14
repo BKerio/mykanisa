@@ -274,6 +274,8 @@ Route::middleware(['auth:sanctum', 'role:elder'])->group(function(){
         Route::post('/communications/broadcast', [\App\Http\Controllers\Elder\MessagesController::class, 'broadcast']);
         Route::get('/messages-from-members', [\App\Http\Controllers\Elder\MessagesController::class, 'messagesFromMembers']);
         Route::post('/messages/{announcement}/reply', [\App\Http\Controllers\Elder\MessagesController::class, 'replyToMember']);
+        Route::post('/messages/{announcement}/mark-read', [\App\Http\Controllers\Elder\MessagesController::class, 'markAsRead']);
+        Route::get('/messages/unread-count', [\App\Http\Controllers\Elder\MessagesController::class, 'unreadCount']);
     });
 });
 
@@ -431,9 +433,12 @@ Route::middleware(['auth:sanctum'])->group(function(){
         Route::get('/notifications', [\App\Http\Controllers\Member\DashboardController::class, 'notifications']);
         Route::post('/notifications/{announcement}/reply', [\App\Http\Controllers\Member\DashboardController::class, 'reply']);
         Route::delete('/notifications/{announcement}', [\App\Http\Controllers\Member\DashboardController::class, 'delete']);
+        Route::post('/notifications/{announcement}/mark-read', [\App\Http\Controllers\Member\DashboardController::class, 'markAsRead']);
+        Route::get('/notifications/unread-count', [\App\Http\Controllers\Member\DashboardController::class, 'unreadCount']);
         Route::get('/events', [\App\Http\Controllers\Member\DashboardController::class, 'events']);
         // Messages to elders
         Route::get('/elders', [\App\Http\Controllers\Member\DashboardController::class, 'getElders']);
         Route::post('/send-message-to-elder', [\App\Http\Controllers\Member\DashboardController::class, 'sendMessageToElder']);
+        Route::get('/sent-messages', [\App\Http\Controllers\Member\DashboardController::class, 'sentMessages']);
     });
 });

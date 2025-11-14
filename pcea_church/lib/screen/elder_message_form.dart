@@ -34,6 +34,7 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
 
   List<Map<String, dynamic>> _messagesFromMembers = [];
   bool _isLoadingMemberMessages = false;
+  int _unreadFromMembersCount = 0;
   final TextEditingController _replyController = TextEditingController();
 
   @override
@@ -244,8 +245,12 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
             }
           }
 
+          // Extract unread count from response
+          int unreadCount = body['unread_from_members_count'] ?? 0;
+
           setState(() {
             _messageHistory = announcements;
+            _unreadFromMembersCount = unreadCount;
             _isLoadingHistory = false;
           });
         } else {
@@ -679,10 +684,28 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
               ),
             ),
             // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A1F44).withOpacity(0.05),
+                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+              ),
               child: Row(
                 children: [
+                  // Avatar with sender initials
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
+                    child: Text(
+                      _getInitials(message['sender']?['full_name'] ?? 'You'),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A1F44),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -692,42 +715,93 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
+                            color: Color(0xFF0A1F44),
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
                             Icon(
-                              Icons.info_outline,
+                              Icons.person_outline,
                               size: 14,
                               color: Colors.grey.shade600,
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              message['type'] == 'broadcast'
-                                  ? 'Broadcast'
-                                  : 'Individual',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            if (message['is_priority'] == true) ...[
-                              const SizedBox(width: 8),
-                              Icon(
-                                Icons.priority_high,
-                                size: 14,
-                                color: Colors.red,
-                              ),
-                              Text(
-                                'Priority',
+                            Expanded(
+                              child: Text(
+                                'Sent by: ${message['sender']?['full_name'] ?? 'You'}',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.red,
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
                                   fontWeight: FontWeight.w500,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: message['type'] == 'broadcast'
+                                    ? Colors.blue.shade50
+                                    : Colors.purple.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                message['type'] == 'broadcast'
+                                    ? 'Broadcast'
+                                    : 'Individual',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: message['type'] == 'broadcast'
+                                      ? Colors.blue.shade700
+                                      : Colors.purple.shade700,
+                                ),
+                              ),
+                            ),
+                            if (message['is_priority'] == true)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.priority_high,
+                                      size: 12,
+                                      color: Colors.red.shade700,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Priority',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.red.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ],
@@ -740,7 +814,6 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                 ],
               ),
             ),
-            const Divider(),
             // Content
             Expanded(
               child: SingleChildScrollView(
@@ -748,10 +821,46 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Message content
-                    Text(
-                      message['message'] ?? '',
-                      style: const TextStyle(fontSize: 16, height: 1.6),
+                    // Message content in a container
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.message,
+                                size: 16,
+                                color: const Color(0xFF0A1F44),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Message Content:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0A1F44),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            message['message'] ?? '',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.6,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
                     // Details card
@@ -767,6 +876,15 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const Text(
+                            'Message Details',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0A1F44),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           _buildDetailRow(
                             Icons.access_time,
                             'Sent',
@@ -779,12 +897,57 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                             '${message['target_count'] ?? 0} member(s)',
                           ),
                           if (message['recipient'] != null) ...[
+                            const SizedBox(height: 16),
+                            const Divider(),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Recipient Information',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0A1F44),
+                              ),
+                            ),
                             const SizedBox(height: 12),
                             _buildDetailRow(
                               Icons.person,
-                              'Recipient',
+                              'Name',
                               message['recipient']['full_name'] ?? 'Unknown',
                             ),
+                            if (message['recipient']['e_kanisa_number'] !=
+                                null) ...[
+                              const SizedBox(height: 12),
+                              _buildDetailRow(
+                                Icons.badge,
+                                'Kanisa Number',
+                                message['recipient']['e_kanisa_number'],
+                              ),
+                            ],
+                            if (message['recipient']['telephone'] != null) ...[
+                              const SizedBox(height: 12),
+                              _buildDetailRow(
+                                Icons.phone,
+                                'Phone',
+                                message['recipient']['telephone'],
+                              ),
+                            ],
+                            if (message['recipient']['email'] != null) ...[
+                              const SizedBox(height: 12),
+                              _buildDetailRow(
+                                Icons.email,
+                                'Email',
+                                message['recipient']['email'],
+                              ),
+                            ],
+                            if (message['recipient']['congregation'] !=
+                                null) ...[
+                              const SizedBox(height: 12),
+                              _buildDetailRow(
+                                Icons.church,
+                                'Congregation',
+                                message['recipient']['congregation'],
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -832,8 +995,8 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text(
-          'Messages',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          'Communication Module',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF0A1F44),
         elevation: 0,
@@ -844,7 +1007,7 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: const [
-            Tab(icon: Icon(Icons.edit_note), text: 'Create'),
+            Tab(icon: Icon(Icons.message_rounded), text: 'New Message'),
             Tab(icon: Icon(Icons.history), text: 'History'),
             Tab(icon: Icon(Icons.inbox), text: 'From Members'),
           ],
@@ -1275,9 +1438,32 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
     );
   }
 
+  String _getInitials(String? name) {
+    if (name == null || name.trim().isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return '?';
+    final firstInitial = parts.first[0].toUpperCase();
+    String secondInitial = '';
+    if (parts.length > 1 && parts.last.isNotEmpty) {
+      secondInitial = parts.last[0].toUpperCase();
+    }
+    return firstInitial + secondInitial;
+  }
+
   Widget _buildMessageHistoryCard(Map<String, dynamic> message) {
     final isBroadcast = message['type'] == 'broadcast';
     final isPriority = message['is_priority'] == true;
+    final recipient = message['recipient'];
+    // For individual messages, check if recipient has read it
+    final isReadByRecipient = message['is_read_by_recipient'] ?? false;
+    // For broadcast, show unread count
+    final unreadCount = message['unread_count'] ?? 0;
+    // Get sender name (elder themselves for sent messages)
+    final senderName =
+        message['sender']?['full_name'] ??
+        (message['sender'] != null ? message['sender'].toString() : null) ??
+        'You';
+    final senderInitials = _getInitials(senderName);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1292,34 +1478,35 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
             borderRadius: BorderRadius.circular(16),
             border: isPriority
                 ? Border.all(color: Colors.red.shade300, width: 2)
-                : null,
+                : Border.all(color: Colors.grey.shade200, width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header row
+              // Header row with avatar, title, and time
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Icon
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0A1F44).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      isBroadcast ? Icons.broadcast_on_personal : Icons.person,
-                      color: const Color(0xFF0A1F44),
-                      size: 24,
+                  // Avatar with initials
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
+                    child: Text(
+                      senderInitials,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A1F44),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Title and type
+                  // Title and type badges
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Title
                         Text(
                           message['title'] ?? 'No Title',
                           style: const TextStyle(
@@ -1330,8 +1517,35 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
+                        // Sender name
                         Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              size: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Sent by: $senderName',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        // Type and Priority badges
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -1355,8 +1569,7 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                                 ),
                               ),
                             ),
-                            if (isPriority) ...[
-                              const SizedBox(width: 6),
+                            if (isPriority)
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
@@ -1386,90 +1599,297 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                                   ],
                                 ),
                               ),
-                            ],
                           ],
                         ),
                       ],
                     ),
                   ),
-                  // Time
-                  Text(
-                    _formatDate(message['created_at']?.toString()),
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  // Time (moved to separate column to prevent overflow)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatDate(message['created_at']?.toString()),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              // Message preview
-              Text(
-                message['message'] ?? '',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade800,
-                  height: 1.4,
-                ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 12),
-              // Stats row
+              const SizedBox(height: 16),
+              // Message text in a container
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatItem(
-                      Icons.people,
-                      'Targets',
-                      '${message['target_count'] ?? 0}',
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.message,
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Message:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    if (message['recipient'] != null)
-                      _buildStatItem(
-                        Icons.person,
-                        'Recipient',
-                        message['recipient']['full_name'] ?? 'Unknown',
+                    const SizedBox(height: 6),
+                    Text(
+                      message['message'] ?? '',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade800,
+                        height: 1.4,
                       ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: () => _showMessageDetails(message),
-                      icon: const Icon(Icons.visibility, size: 16),
-                      label: const Text('View Details'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF0A1F44),
-                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Details section with proper spacing
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A1F44).withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Target count
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.people,
+                          size: 16,
+                          color: const Color(0xFF0A1F44),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Targets: ${message['target_count'] ?? 0} member${(message['target_count'] ?? 0) != 1 ? 's' : ''}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF0A1F44),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Recipient details for individual messages
+                    if (recipient != null && !isBroadcast) ...[
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 12),
+                      // Recipient name
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person,
+                            size: 16,
+                            color: const Color(0xFF0A1F44),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              recipient['full_name'] ?? 'Unknown',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF0A1F44),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // E-kanisa number
+                      if (recipient['e_kanisa_number'] != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.badge,
+                              size: 16,
+                              color: const Color(0xFF0A1F44),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Kanisa Number: ${recipient['e_kanisa_number']}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      // Read status for individual messages
+                      if (!isBroadcast) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              isReadByRecipient ? Icons.mark_email_read : Icons.mark_email_unread,
+                              size: 16,
+                              color: isReadByRecipient ? Colors.green : Colors.orange,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isReadByRecipient ? 'Read by recipient' : 'Unread by recipient',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: isReadByRecipient ? Colors.green.shade700 : Colors.orange.shade700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      // Unread count for broadcast messages
+                      if (isBroadcast && unreadCount > 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 16,
+                              color: Colors.orange,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$unreadCount unread member${unreadCount != 1 ? 's' : ''}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.orange.shade700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      // Recipient phone
+                      if (recipient['telephone'] != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.phone,
+                              size: 16,
+                              color: const Color(0xFF0A1F44),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                recipient['telephone'],
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      // Recipient email
+                      if (recipient['email'] != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.email,
+                              size: 16,
+                              color: const Color(0xFF0A1F44),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                recipient['email'],
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              // View button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showMessageDetails(message),
+                  icon: const Icon(Icons.visibility, size: 18),
+                  label: const Text(
+                    'View Full Details',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0A1F44),
+                    side: const BorderSide(
+                      color: Color(0xFF0A1F44),
+                      width: 1.5,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildStatItem(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
-        const SizedBox(width: 4),
-        Text(
-          '$label: ',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF0A1F44),
-          ),
-        ),
-      ],
     );
   }
 
@@ -1524,8 +1944,12 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
             }
           }
 
+          // Extract unread count from response
+          int unreadCount = body['unread_count'] ?? 0;
+
           setState(() {
             _messagesFromMembers = messages;
+            _unreadFromMembersCount = unreadCount;
             _isLoadingMemberMessages = false;
           });
         } else {
@@ -1714,10 +2138,12 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
     final senderEmail = message['sender']?['email'] ?? '';
     final hasReplies =
         message['replies'] != null && (message['replies'] as List).isNotEmpty;
+    final isRead = message['is_read'] == true;
+    final senderInitials = _getInitials(senderName);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
+      elevation: isRead ? 1 : 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: () => _showMemberMessageDetails(message),
@@ -1727,8 +2153,12 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: hasReplies ? Colors.green.shade200 : Colors.grey.shade200,
+              color: hasReplies
+                  ? Colors.green.shade200
+                  : (isRead ? Colors.grey.shade200 : const Color(0xFF0A1F44).withOpacity(0.3)),
+              width: isRead ? 1 : 2,
             ),
+            color: isRead ? Colors.white : const Color(0xFF0A1F44).withOpacity(0.02),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1737,18 +2167,37 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Icon
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0A1F44).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      color: Color(0xFF0A1F44),
-                      size: 24,
-                    ),
+                  // Avatar with sender initials and unread indicator
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
+                        child: Text(
+                          senderInitials,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0A1F44),
+                          ),
+                        ),
+                      ),
+                      if (!isRead)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(width: 12),
                   // Title and sender
@@ -1771,7 +2220,7 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                           children: [
                             Icon(
                               Icons.person_outline,
-                              size: 14,
+                              size: 12,
                               color: Colors.grey.shade600,
                             ),
                             const SizedBox(width: 4),
@@ -1808,15 +2257,22 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(height: 2),
                       Text(
                         _formatDate(message['created_at']?.toString()),
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: Colors.grey.shade600,
                         ),
+                        textAlign: TextAlign.right,
                       ),
                       if (hasReplies) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
@@ -1901,7 +2357,43 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
     );
   }
 
+  Future<void> _markMessageAsRead(Map<String, dynamic> message) async {
+    // Only mark as read if not already read
+    if (message['is_read'] == true) {
+      return;
+    }
+
+    try {
+      final result = await API().postRequest(
+        url: Uri.parse(
+          '${Config.baseUrl}/elder/messages/${message['id']}/mark-read',
+        ),
+        data: {},
+      );
+
+      final response = jsonDecode(result.body) as Map<String, dynamic>?;
+
+      if (result.statusCode == 200 && response?['status'] == 200) {
+        // Update unread count
+        setState(() {
+          _unreadFromMembersCount = response?['unread_count'] ?? 0;
+          // Update message read status in local list
+          final index = _messagesFromMembers.indexWhere((m) => m['id'] == message['id']);
+          if (index != -1) {
+            _messagesFromMembers[index]['is_read'] = true;
+            _messagesFromMembers[index]['read_at'] = DateTime.now().toIso8601String();
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error marking message as read: $e');
+    }
+  }
+
   void _showMemberMessageDetails(Map<String, dynamic> message) {
+    // Mark as read when viewing
+    _markMessageAsRead(message);
+
     final senderName = message['sender']?['full_name'] ?? 'Member';
     final senderEmail = message['sender']?['email'] ?? '';
     final senderPhone = message['sender']?['telephone'] ?? '';
@@ -1937,19 +2429,20 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0A1F44).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      color: Color(0xFF0A1F44),
-                      size: 24,
+                  // Avatar with sender initials
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
+                    child: Text(
+                      _getInitials(senderName),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A1F44),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1961,15 +2454,44 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0A1F44),
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'From: $senderName',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              size: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'From: $senderName',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (senderEmail.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            senderEmail,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

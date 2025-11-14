@@ -239,21 +239,38 @@ class MessagesController extends Controller
                 $query->select('id', 'full_name', 'email', 'role', 'telephone');
             }, 'replies.sender' => function($query) {
                 $query->select('id', 'full_name', 'email', 'role');
+            }, 'readers' => function($query) use ($memberId) {
+                $query->where('member_id', $memberId)->select('member_id', 'read_at');
             }])
             ->orderBy('is_priority', 'desc')
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
-        // Mark unread messages
-        foreach ($messages as $message) {
-            if (!$message->isReadBy($memberId)) {
-                $message->markAsReadBy($memberId);
-            }
-        }
+        // Add read status to each message
+        $messagesData = $messages->map(function($message) use ($memberId) {
+            $messageArray = $message->toArray();
+            $messageArray['is_read'] = $message->isReadBy($memberId);
+            $messageArray['read_at'] = $message->readers()
+                ->where('member_id', $memberId)
+                ->first()?->pivot->read_at;
+            return $messageArray;
+        });
+
+        // Count unread messages
+        $unreadCount = Announcement::where('recipient_id', $memberId)
+            ->whereHas('sender', function($query) {
+                $query->where('role', '!=', 'elder')
+                      ->orWhereNull('role');
+            })
+            ->whereDoesntHave('readers', function($q) use ($memberId) {
+                $q->where('member_id', $memberId);
+            })
+            ->count();
 
         return response()->json([
             'status' => 200,
-            'messages' => $messages->items(),
+            'messages' => $messagesData,
+            'unread_count' => $unreadCount,
             'pagination' => [
                 'current_page' => $messages->currentPage(),
                 'last_page' => $messages->lastPage(),
@@ -362,13 +379,57 @@ class MessagesController extends Controller
         }
         
         $announcements = Announcement::where('sent_by', $memberId)
-            ->with(['sender', 'recipient'])
+            ->with(['sender' => function($query) {
+                $query->select('id', 'full_name', 'email', 'telephone', 'e_kanisa_number', 'congregation', 'role');
+            }, 'recipient' => function($query) {
+                $query->select('id', 'full_name', 'email', 'telephone', 'e_kanisa_number', 'congregation');
+            }, 'readers' => function($query) {
+                $query->select('member_id', 'read_at');
+            }])
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
+        // Add read count for each announcement
+        $announcementsData = $announcements->map(function($announcement) use ($memberId) {
+            $announcementArray = $announcement->toArray();
+            // For broadcast: count how many members have read it
+            // For individual: check if recipient has read it
+            if ($announcement->type === 'broadcast') {
+                $announcementArray['read_count'] = $announcement->readers()->count();
+                // Get total member count (could be improved to get actual target count)
+                $announcementArray['total_recipients'] = $announcement->target_count ?? 0;
+                $announcementArray['unread_count'] = max(0, $announcementArray['total_recipients'] - $announcementArray['read_count']);
+            } else {
+                $announcementArray['is_read_by_recipient'] = $announcement->recipient_id 
+                    ? $announcement->isReadBy($announcement->recipient_id)
+                    : false;
+                $announcementArray['read_at_by_recipient'] = $announcement->recipient_id 
+                    ? ($announcement->readers()->where('member_id', $announcement->recipient_id)->first()?->pivot->read_at ?? null)
+                    : null;
+            }
+            return $announcementArray;
+        });
+
+        // Count unread messages FROM members (messages where elder is recipient and hasn't read)
+        $unreadFromMembersCount = Announcement::where('recipient_id', $memberId)
+            ->whereHas('sender', function($query) {
+                $query->where('role', '!=', 'elder')->orWhereNull('role');
+            })
+            ->whereDoesntHave('readers', function($q) use ($memberId) {
+                $q->where('member_id', $memberId);
+            })
+            ->count();
+
         return response()->json([
             'status' => 200,
-            'announcements' => $announcements,
+            'announcements' => $announcementsData,
+            'unread_from_members_count' => $unreadFromMembersCount,
+            'pagination' => [
+                'current_page' => $announcements->currentPage(),
+                'last_page' => $announcements->lastPage(),
+                'per_page' => $announcements->perPage(),
+                'total' => $announcements->total(),
+            ],
         ]);
     }
 
@@ -507,6 +568,105 @@ class MessagesController extends Controller
             'target_count' => $targetCount,
             'sms_sent_count' => $smsSentCount,
             'sms_failed_count' => $smsFailedCount,
+        ]);
+    }
+
+    /**
+     * Mark an announcement as read by elder
+     */
+    public function markAsRead(Request $request, $announcementId)
+    {
+        $user = $request->user();
+        
+        // Get member ID
+        $memberId = null;
+        if ($user instanceof Member) {
+            $memberId = $user->id;
+        } else {
+            $member = Member::where('email', $user->email)->first();
+            if (!$member) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Member record not found'
+                ], 404);
+            }
+            $memberId = $member->id;
+        }
+        
+        $announcement = Announcement::findOrFail($announcementId);
+        
+        // Verify the elder has access to this announcement
+        // Elder can mark as read if:
+        // 1. They sent it (sent_by == memberId)
+        // 2. They received it (recipient_id == memberId)
+        $hasAccess = ($announcement->sent_by == $memberId) || 
+                     ($announcement->recipient_id == $memberId);
+        
+        if (!$hasAccess) {
+            return response()->json([
+                'status' => 403,
+                'message' => 'You do not have access to this message'
+            ], 403);
+        }
+        
+        // Mark as read
+        if (!$announcement->isReadBy($memberId)) {
+            $announcement->markAsReadBy($memberId);
+        }
+        
+        // Get updated unread count (for messages from members)
+        $unreadCount = Announcement::where('recipient_id', $memberId)
+            ->whereHas('sender', function($query) {
+                $query->where('role', '!=', 'elder')
+                      ->orWhereNull('role');
+            })
+            ->whereDoesntHave('readers', function($q) use ($memberId) {
+                $q->where('member_id', $memberId);
+            })
+            ->count();
+        
+        return response()->json([
+            'status' => 200,
+            'message' => 'Message marked as read',
+            'unread_count' => $unreadCount,
+        ]);
+    }
+
+    /**
+     * Get unread message count for elder (messages from members)
+     */
+    public function unreadCount(Request $request)
+    {
+        $user = $request->user();
+        
+        // Get member ID
+        $memberId = null;
+        if ($user instanceof Member) {
+            $memberId = $user->id;
+        } else {
+            $member = Member::where('email', $user->email)->first();
+            if (!$member) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Member record not found'
+                ], 404);
+            }
+            $memberId = $member->id;
+        }
+        
+        $unreadCount = Announcement::where('recipient_id', $memberId)
+            ->whereHas('sender', function($query) {
+                $query->where('role', '!=', 'elder')
+                      ->orWhereNull('role');
+            })
+            ->whereDoesntHave('readers', function($q) use ($memberId) {
+                $q->where('member_id', $memberId);
+            })
+            ->count();
+        
+        return response()->json([
+            'status' => 200,
+            'unread_count' => $unreadCount,
         ]);
     }
 }

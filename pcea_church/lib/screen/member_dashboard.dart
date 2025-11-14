@@ -32,8 +32,8 @@ class MemberDashboard extends BaseDashboard {
         },
       ),
       DashboardCard(
-        icon: Icons.messenger,
-        title: 'Messages',
+        icon: Icons.message_rounded,
+        title: 'Communications from Elders',
         color: Colors.teal,
         subtitle: 'View messages from elders',
         onTap: () {
