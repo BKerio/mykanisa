@@ -110,9 +110,14 @@ class MessagesController extends Controller
         if ($validated['type'] === 'individual' && $recipient) {
             // Send SMS to individual recipient
             try {
-                $smsMessage = "From PCEA Church\n\n";
-                $smsMessage .= "Title: " . $validated['title'] . "\n\n";
+                $sender = Member::find($memberId);
+                $senderName = $sender ? $sender->full_name : 'Church Elder';
+                
+                $smsMessage = "Hello {$recipient->full_name},\n\n";
+                $smsMessage .= "You have a message from {$senderName}:\n\n";
+                $smsMessage .= "Subject: {$validated['title']}\n\n";
                 $smsMessage .= $validated['message'];
+                $smsMessage .= "\n\n- PCEA Church";
                 
                 $smsSent = $this->smsService->sendSms($recipient->telephone, $smsMessage);
                 
@@ -146,11 +151,16 @@ class MessagesController extends Controller
                 ->where('telephone', '!=', '')
                 ->get();
             
-            $smsMessage = "From PCEA Church\n\n";
-            $smsMessage .= "Title: " . $validated['title'] . "\n\n";
-            $smsMessage .= $validated['message'];
+            $sender = Member::find($memberId);
+            $senderName = $sender ? $sender->full_name : 'Church Elder';
             
             foreach ($broadcastMembers as $member) {
+                $smsMessage = "Hello {$member->full_name},\n\n";
+                $smsMessage .= "Message from {$senderName}:\n\n";
+                $smsMessage .= "Subject: {$validated['title']}\n\n";
+                $smsMessage .= $validated['message'];
+                $smsMessage .= "\n\n- PCEA Church";
+                
                 try {
                     $smsResult = $this->smsService->sendSms($member->telephone, $smsMessage);
                     if ($smsResult) {
@@ -335,10 +345,15 @@ class MessagesController extends Controller
         try {
             $member = Member::find($memberSenderId);
             if ($member && $member->telephone) {
-                $elderName = $user instanceof Member ? $user->full_name : 'Church Elder';
-                $smsMessage = "Reply from {$elderName}\n\n";
+                $elder = Member::find($memberId);
+                $elderName = $elder ? $elder->full_name : 'Church Elder';
+                
+                $smsMessage = "Hello {$member->full_name},\n\n";
+                $smsMessage .= "Reply from {$elderName}:\n\n";
                 $smsMessage .= "Re: {$originalMessage->title}\n\n";
                 $smsMessage .= $validated['message'];
+                $smsMessage .= "\n\n- PCEA Church";
+                
                 $this->smsService->sendSms($member->telephone, $smsMessage);
             }
         } catch (\Exception $e) {
@@ -525,12 +540,18 @@ class MessagesController extends Controller
         // Send SMS to all target members
         $smsSentCount = 0;
         $smsFailedCount = 0;
-        $smsMessage = "From PCEA Church\n\n";
-        $smsMessage .= "Title: " . $validated['title'] . "\n\n";
-        $smsMessage .= $validated['message'];
+        
+        $sender = Member::find($memberId);
+        $senderName = $sender ? $sender->full_name : 'Church Elder';
         
         foreach ($targetMembers as $member) {
             try {
+                $smsMessage = "Hello {$member->full_name},\n\n";
+                $smsMessage .= "Message from {$senderName}:\n\n";
+                $smsMessage .= "Subject: {$validated['title']}\n\n";
+                $smsMessage .= $validated['message'];
+                $smsMessage .= "\n\n- PCEA Church";
+                
                 $smsSent = $this->smsService->sendSms($member->telephone, $smsMessage);
                 if ($smsSent) {
                     $smsSentCount++;

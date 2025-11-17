@@ -194,8 +194,8 @@ class BaseDashboardState extends State<BaseDashboard> {
           width: imageSize,
           height: imageSize,
           errorBuilder: (context, error, stackTrace) {
-            print('Error loading profile image: $error');
-            print('Failed URL: $imageUrl');
+            //print('Error loading profile image: $error');
+            //print('Failed URL: $imageUrl');
             return Image.asset(
               'assets/icon.png',
               fit: BoxFit.cover,
@@ -593,7 +593,7 @@ class BaseDashboardState extends State<BaseDashboard> {
               ),
               icon: const Icon(
                 Icons.notifications,
-                color: Colors.black54,
+                color: Colors.redAccent,
                 size: 36,
               ),
             ),

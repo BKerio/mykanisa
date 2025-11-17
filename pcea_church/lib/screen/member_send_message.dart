@@ -513,7 +513,7 @@ class _MemberSendMessageScreenState extends State<MemberSendMessageScreen> {
                   labelText: 'Message *',
                   hintText: 'Type your message here...',
                   prefixIcon: const Icon(
-                    Icons.message,
+                    Icons.campaign_rounded,
                     color: Color(0xFF0A1F44),
                   ),
                   border: OutlineInputBorder(

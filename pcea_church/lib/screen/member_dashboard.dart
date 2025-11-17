@@ -22,7 +22,7 @@ class MemberDashboard extends BaseDashboard {
       DashboardCard(
         icon: Icons.account_balance_wallet_rounded,
         title: 'My Account summary',
-        color: Colors.blue,
+        color: Colors.teal,
         subtitle: 'View & edit profile',
         onTap: () {
           Navigator.push(
@@ -32,8 +32,8 @@ class MemberDashboard extends BaseDashboard {
         },
       ),
       DashboardCard(
-        icon: Icons.message_rounded,
-        title: 'Communications from Elders',
+        icon: Icons.campaign,
+        title: 'Church Communications',
         color: Colors.teal,
         subtitle: 'View messages from elders',
         onTap: () {
@@ -48,7 +48,7 @@ class MemberDashboard extends BaseDashboard {
       DashboardCard(
         icon: Icons.wallet_rounded,
         title: 'Contribute via m-Pesa',
-        color: Colors.green,
+        color: Colors.teal,
         subtitle: 'Make contributions',
         onTap: () {
           Navigator.push(
@@ -60,7 +60,7 @@ class MemberDashboard extends BaseDashboard {
       DashboardCard(
         icon: Icons.flag,
         title: 'My Pledges',
-        color: Colors.orange,
+        color: Colors.teal,
         subtitle: 'Manage pledges',
         onTap: () {
           Navigator.push(
@@ -72,7 +72,7 @@ class MemberDashboard extends BaseDashboard {
       DashboardCard(
         icon: Icons.groups,
         title: 'Church groups',
-        color: Color(0xFF0A1F44),
+        color: Colors.teal,
         subtitle: 'Manage your church groups',
         onTap: () {
           Navigator.push(
@@ -83,8 +83,8 @@ class MemberDashboard extends BaseDashboard {
       ),
       DashboardCard(
         icon: Icons.event,
-        title: 'Church Events',
-        color: Colors.orange,
+        title: 'Church Calender',
+        color: Colors.teal,
         subtitle: 'View events',
         onTap: () {
           Navigator.push(
@@ -101,7 +101,7 @@ class MemberDashboard extends BaseDashboard {
     return const [
       BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
       BottomNavigationBarItem(
-        icon: Icon(Icons.message_rounded),
+        icon: Icon(Icons.campaign_rounded),
         label: "Messages",
       ),
       BottomNavigationBarItem(icon: Icon(Icons.group), label: "Dependents"),

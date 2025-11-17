@@ -239,8 +239,8 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
                         backgroundColor: Colors.blueAccent.withOpacity(0.15),
                         radius: 24,
                         child: const Icon(
-                          Icons.group,
-                          color: Colors.blueAccent,
+                          Icons.groups,
+                          color: Color(0xFF0A1F44),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -269,7 +269,7 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
                         child: Icon(
                           Icons.arrow_forward_ios,
                           size: 16,
-                          color: Colors.blueAccent.withOpacity(0.6),
+                          color: Color(0xFF0A1F44),
                         ),
                       ),
                     ],

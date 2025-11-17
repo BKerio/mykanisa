@@ -3,136 +3,273 @@
 namespace App\Http\Controllers\Elder;
 
 use App\Http\Controllers\Controller;
-use App\Models\Contribution;
+use App\Models\Payment;
 use App\Models\Member;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ContributionsController extends Controller
 {
     /**
-     * Display a listing of contributions
+     * Display a listing of payments (contributions) with optional filtering by congregation
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        
-        $query = Contribution::with(['member']);
-        
-        $congregation = $request->input('congregation');
-        $parish = $request->input('parish');
-        $presbytery = $request->input('presbytery');
-        
+        $perPage = (int)($request->query('per_page', 20));
+        $congregation = $request->query('congregation');
+        $status = $request->query('status');
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        $search = trim((string)$request->query('q', ''));
+
+        $query = Payment::with(['member:id,full_name,e_kanisa_number,congregation,district,parish,presbytery,region']);
+
+        // Filter by congregation
+        if ($congregation) {
+            $query->whereHas('member', function($q) use ($congregation) {
+                $q->where('congregation', 'like', "%{$congregation}%");
+            });
+        }
+
+        // Filter by status
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        // Filter by date range
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->where('created_at', '<=', $dateTo);
+        }
+
+        // Search functionality
+        if ($search !== '') {
+            $query->where(function($q) use ($search) {
+                $q->where('mpesa_receipt_number', 'like', "%{$search}%")
+                  ->orWhere('account_reference', 'like', "%{$search}%")
+                  ->orWhereHas('member', function($memberQuery) use ($search) {
+                      $memberQuery->where('full_name', 'like', "%{$search}%")
+                                 ->orWhere('e_kanisa_number', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $payments = $query->orderByDesc('created_at')
+                         ->paginate($perPage);
+
+        return response()->json($payments);
+    }
+
+    /**
+     * Get payments grouped by congregation
+     */
+    public function byCongregation(Request $request)
+    {
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        $congregation = $request->query('congregation');
+
+        $query = Payment::with(['member:id,full_name,e_kanisa_number,congregation,district,parish,presbytery,region'])
+                        ->where('status', 'confirmed');
+        // Filter by congregation (optional)
         if ($congregation) {
             $query->whereHas('member', function($q) use ($congregation) {
                 $q->where('congregation', $congregation);
             });
         }
-        
-        if ($request->has('start_date')) {
-            $query->where('contribution_date', '>=', $request->input('start_date'));
+
+        // Filter by date range
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom);
         }
-        if ($request->has('end_date')) {
-            $query->where('contribution_date', '<=', $request->input('end_date'));
+        if ($dateTo) {
+            $query->where('created_at', '<=', $dateTo);
         }
-        if ($request->has('type')) {
-            $query->where('type', $request->input('type'));
-        }
-        
-        $contributions = $query->orderBy('contribution_date', 'desc')
-            ->paginate(20);
-            
+
+        $payments = $query->get();
+
+        // Group by congregation
+        $grouped = $payments->groupBy('member.congregation')->map(function ($congregationPayments, $congregationName) {
+            return [
+                'congregation' => $congregationName,
+                'total_amount' => $congregationPayments->sum('amount'),
+                'total_contributions' => $congregationPayments->count(),
+                'contributions' => $congregationPayments->map(function ($payment) {
+                    return [
+                        'id' => $payment->id,
+                        'member_name' => $payment->member->full_name,
+                        'e_kanisa_number' => $payment->member->e_kanisa_number,
+                        'amount' => $payment->amount,
+                        'mpesa_receipt_number' => $payment->mpesa_receipt_number,
+                        'account_reference' => $payment->account_reference,
+                        'created_at' => $payment->created_at,
+                        'status' => $payment->status,
+                    ];
+                }),
+            ];
+        });
+
         return response()->json([
-            'status' => 200,
-            'contributions' => $contributions
+            'congregations' => $grouped->values(),
+            'summary' => [
+                'total_congregations' => $grouped->count(),
+                'total_amount' => $payments->sum('amount'),
+                'total_contributions' => $payments->count(),
+            ]
         ]);
     }
 
     /**
-     * Display the specified contribution
-     */
-    public function show(Request $request, Contribution $contribution)
-    {
-        $user = $request->user();
-        
-        // Elder has full permissions - no scope restrictions
-        
-        $contribution->load(['member', 'member.dependencies']);
-        
-        return response()->json([
-            'status' => 200,
-            'contribution' => $contribution
-        ]);
-    }
-
-    /**
-     * Create a new contribution
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'member_id' => 'required|exists:members,id',
-            'type' => 'required|string',
-            'amount' => 'required|numeric|min:0',
-            'contribution_date' => 'required|date',
-            'description' => 'nullable|string',
-            'payment_method' => 'nullable|string',
-        ]);
-
-        $member = Member::findOrFail($validated['member_id']);
-        
-        // Elder has full permissions - no scope restrictions
-        
-        $contribution = Contribution::create($validated);
-        $contribution->load('member');
-        
-        return response()->json([
-            'status' => 200,
-            'message' => 'Contribution recorded successfully',
-            'contribution' => $contribution
-        ], 201);
-    }
-
-    /**
-     * Get contribution statistics
+     * Get payment statistics
      */
     public function statistics(Request $request)
     {
-        $user = $request->user();
-        
-        $query = Contribution::query();
-        
-        $congregation = $request->input('congregation');
-        
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        $congregation = $request->query('congregation');
+
+        $query = Payment::where('status', 'confirmed');
+
+        // Filter by date range
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->where('created_at', '<=', $dateTo);
+        }
+
+        // Filter by congregation
+        if ($congregation) {
+            $query->whereHas('member', function($q) use ($congregation) {
+                $q->where('congregation', 'like', "%{$congregation}%");
+            });
+        }
+
+        $payments = $query->get();
+
+        // Statistics by congregation
+        $byCongregation = $payments->groupBy('member.congregation')->map(function ($congregationPayments) {
+            return [
+                'congregation' => $congregationPayments->first()->member->congregation,
+                'count' => $congregationPayments->count(),
+                'total_amount' => $congregationPayments->sum('amount'),
+                'average_amount' => $congregationPayments->avg('amount'),
+            ];
+        });
+
+        // Monthly statistics
+        $monthly = $payments->groupBy(function ($payment) {
+            return $payment->created_at->format('Y-m');
+        })->map(function ($monthPayments) {
+            return [
+                'month' => $monthPayments->first()->created_at->format('Y-m'),
+                'count' => $monthPayments->count(),
+                'total_amount' => $monthPayments->sum('amount'),
+            ];
+        });
+
+        return response()->json([
+            'overview' => [
+                'total_contributions' => $payments->count(),
+                'total_amount' => $payments->sum('amount'),
+                'average_contribution' => $payments->avg('amount'),
+            ],
+            'by_congregation' => $byCongregation->values(),
+            'monthly' => $monthly->values(),
+        ]);
+    }
+
+    /**
+     * Display the specified payment
+     */
+    public function show(Payment $payment)
+    {
+        $payment->load(['member:id,full_name,e_kanisa_number,congregation,district,parish,presbytery,region,telephone,email']);
+        return response()->json($payment);
+    }
+
+    /**
+     * Get list of unique congregations
+     */
+    public function congregations()
+    {
+        $congregations = Member::select('congregation')
+                              ->distinct()
+                              ->orderBy('congregation')
+                              ->pluck('congregation');
+
+        return response()->json($congregations);
+    }
+
+    /**
+     * Get payment types based on account reference patterns
+     */
+    public function types()
+    {
+        $types = [
+            'Tithe',
+            'Offering',
+            'Development',
+            'Thanksgiving',
+            'FirstFruit',
+            'Others',
+        ];
+
+        return response()->json($types);
+    }
+
+    /**
+     * Get all unique congregations with their church structure
+     */
+    public function congregationsWithLocations()
+    {
+        $rows = Member::query()
+            ->select('congregation', 'district', 'parish', 'presbytery', 'region')
+            ->whereNotNull('congregation')
+            ->where('congregation', '!=', '')
+            ->groupBy('congregation', 'district', 'parish', 'presbytery', 'region')
+            ->orderBy('congregation')
+            ->get();
+
+        return response()->json($rows);
+    }
+
+    /**
+     * Get total contributions amount (and count) with optional filters
+     */
+    public function total(Request $request)
+    {
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        $congregation = $request->query('congregation');
+
+        $query = Payment::query()
+            ->where('status', 'confirmed')
+            ->with(['member:id,region,presbytery,parish,district,congregation']);
+
+        // Filter by congregation
         if ($congregation) {
             $query->whereHas('member', function($q) use ($congregation) {
                 $q->where('congregation', $congregation);
             });
         }
-        
-        $totalContributions = $query->sum('amount');
-        $totalCount = $query->count();
-        $averageContribution = $totalCount > 0 ? $totalContributions / $totalCount : 0;
-        
-        $monthlyStats = $query->whereYear('contribution_date', now()->year)
-            ->selectRaw('MONTH(contribution_date) as month, SUM(amount) as total, COUNT(*) as count')
-            ->groupBy('month')
-            ->get()
-            ->keyBy('month');
-            
-        $typeBreakdown = $query->selectRaw('type, SUM(amount) as total, COUNT(*) as count')
-            ->groupBy('type')
-            ->get();
-            
+
+        // Date range
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->where('created_at', '<=', $dateTo);
+        }
+
+        $totalAmount = (float) $query->sum('amount');
+        $totalCount = (int) $query->count();
+
         return response()->json([
-            'status' => 200,
-            'statistics' => [
-                'total_amount' => $totalContributions,
-                'total_count' => $totalCount,
-                'average_amount' => round($averageContribution, 2),
-                'monthly_breakdown' => $monthlyStats,
-                'type_breakdown' => $typeBreakdown,
-                'scope' => compact('congregation', 'parish', 'presbytery')
-            ]
+            'total_amount' => $totalAmount,
+            'total_contributions' => $totalCount,
         ]);
     }
 }

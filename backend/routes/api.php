@@ -263,9 +263,13 @@ Route::middleware(['auth:sanctum', 'role:elder'])->group(function(){
         Route::delete('/members/{member}', [\App\Http\Controllers\Elder\MembersController::class, 'destroy']);
         
         Route::get('/contributions', [\App\Http\Controllers\Elder\ContributionsController::class, 'index']);
-        Route::post('/contributions', [\App\Http\Controllers\Elder\ContributionsController::class, 'store']);
-        Route::get('/contributions/{contribution}', [\App\Http\Controllers\Elder\ContributionsController::class, 'show']);
-        Route::get('/contributions-statistics', [\App\Http\Controllers\Elder\ContributionsController::class, 'statistics']);
+        Route::get('/contributions/by-congregation', [\App\Http\Controllers\Elder\ContributionsController::class, 'byCongregation']);
+        Route::get('/contributions/statistics', [\App\Http\Controllers\Elder\ContributionsController::class, 'statistics']);
+        Route::get('/contributions/{payment}', [\App\Http\Controllers\Elder\ContributionsController::class, 'show']);
+        Route::get('/contributions-meta/congregations', [\App\Http\Controllers\Elder\ContributionsController::class, 'congregations']);
+        Route::get('/contributions-meta/types', [\App\Http\Controllers\Elder\ContributionsController::class, 'types']);
+        Route::get('/contributions-meta/congregations-with-locations', [\App\Http\Controllers\Elder\ContributionsController::class, 'congregationsWithLocations']);
+        Route::get('/contributions/total', [\App\Http\Controllers\Elder\ContributionsController::class, 'total']);
         
         // Messages/Announcements routes
         Route::post('/messages', [\App\Http\Controllers\Elder\MessagesController::class, 'store']);

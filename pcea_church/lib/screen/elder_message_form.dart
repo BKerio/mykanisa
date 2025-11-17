@@ -14,8 +14,14 @@ class ElderMessageFormScreen extends StatefulWidget {
 }
 
 class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
+  late AnimationController _emptyStateController;
+  late AnimationController _pulseController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _slideAnimation;
+  late Animation<double> _pulseAnimation;
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _messageController = TextEditingController();
@@ -50,13 +56,56 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
     // Load messages from members
     _loadMessagesFromMembers();
 
-    // Listen to tab changes to refresh data
+    // Initialize animation controllers
+    _emptyStateController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    // Setup animations
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _emptyStateController,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _emptyStateController,
+        curve: const Interval(0.0, 0.8, curve: Curves.elasticOut),
+      ),
+    );
+
+    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _emptyStateController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+      ),
+    );
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // Start animation when empty state is shown
+    _emptyStateController.forward();
+
+    // Listen to tab changes to refresh data and restart animations
     _tabController.addListener(() {
       if (_tabController.index == 1 && _messageHistory.isEmpty) {
         _loadMessageHistory();
       } else if (_tabController.index == 2 && _messagesFromMembers.isEmpty) {
         _loadMessagesFromMembers();
       }
+      // Restart animation when switching tabs
+      _emptyStateController.reset();
+      _emptyStateController.forward();
     });
   }
 
@@ -68,6 +117,8 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
     _messageController.dispose();
     _recipientController.dispose();
     _replyController.dispose();
+    _emptyStateController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -660,6 +711,106 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
     }
   }
 
+  String _formatTime(String? dateString) {
+    if (dateString == null) return '';
+    try {
+      final date = DateTime.parse(dateString);
+      return DateFormat('h:mm a').format(date);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  // WhatsApp-style read receipt widget
+  Widget _buildReadReceipt(bool isRead) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.done_all,
+          size: 16,
+          color: isRead ? Colors.blue : Colors.grey.shade600,
+        ),
+      ],
+    );
+  }
+
+  // WhatsApp-style message bubble
+  Widget _buildWhatsAppBubble({
+    required String message,
+    required String time,
+    required bool isSent,
+    required bool isRead,
+    String? senderName,
+  }) {
+    return Align(
+      alignment: isSent ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.only(
+          top: 4,
+          bottom: 4,
+          left: isSent ? 50 : 8,
+          right: isSent ? 8 : 50,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSent ? const Color(0xFFDCF8C6) : Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(8),
+            topRight: const Radius.circular(8),
+            bottomLeft: Radius.circular(isSent ? 8 : 0),
+            bottomRight: Radius.circular(isSent ? 0 : 8),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 2,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!isSent && senderName != null) ...[
+              Text(
+                senderName,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isSent ? Colors.black87 : Colors.blue.shade700,
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+            Text(
+              message,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  time,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+                if (isSent) ...[
+                  const SizedBox(width: 4),
+                  _buildReadReceipt(isRead),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showMessageDetails(Map<String, dynamic> message) {
     showModalBottomSheet(
       context: context,
@@ -995,7 +1146,7 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text(
-          'Communication Module',
+          'Church Communication',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF0A1F44),
@@ -1007,9 +1158,12 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: const [
-            Tab(icon: Icon(Icons.message_rounded), text: 'New Message'),
+            Tab(icon: Icon(Icons.campaign), text: 'New Message'),
             Tab(icon: Icon(Icons.history), text: 'History'),
-            Tab(icon: Icon(Icons.inbox), text: 'From Members'),
+            Tab(
+              icon: Icon(Icons.mark_email_unread_rounded),
+              text: 'From Members',
+            ),
           ],
         ),
       ),
@@ -1405,27 +1559,66 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
               ),
             )
           : _messageHistory.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 80, color: Colors.grey.shade400),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No Messages Yet',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade600,
-                    ),
+          ? AnimatedBuilder(
+              animation: _emptyStateController,
+              builder: (context, child) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Animated icon with pulse effect
+                      AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale:
+                                _scaleAnimation.value * _pulseAnimation.value,
+                            child: Opacity(
+                              opacity: _fadeAnimation.value,
+                              child: Icon(
+                                Icons.history,
+                                size: 80,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      // Animated title
+                      Transform.translate(
+                        offset: Offset(0, _slideAnimation.value),
+                        child: Opacity(
+                          opacity: _fadeAnimation.value,
+                          child: Text(
+                            'No Messages Yet',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Animated description
+                      Transform.translate(
+                        offset: Offset(0, _slideAnimation.value),
+                        child: Opacity(
+                          opacity: _fadeAnimation.value,
+                          child: Text(
+                            'Your message history will appear here',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your message history will appear here',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-                  ),
-                ],
-              ),
+                );
+              },
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -1762,18 +1955,26 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                         Row(
                           children: [
                             Icon(
-                              isReadByRecipient ? Icons.mark_email_read : Icons.mark_email_unread,
+                              isReadByRecipient
+                                  ? Icons.mark_email_read
+                                  : Icons.mark_email_unread,
                               size: 16,
-                              color: isReadByRecipient ? Colors.green : Colors.orange,
+                              color: isReadByRecipient
+                                  ? Colors.green
+                                  : Colors.orange,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                isReadByRecipient ? 'Read by recipient' : 'Unread by recipient',
+                                isReadByRecipient
+                                    ? 'Read by recipient'
+                                    : 'Unread by recipient',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
-                                  color: isReadByRecipient ? Colors.green.shade700 : Colors.orange.shade700,
+                                  color: isReadByRecipient
+                                      ? Colors.green.shade700
+                                      : Colors.orange.shade700,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -2096,31 +2297,66 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
               ),
             )
           : _messagesFromMembers.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.inbox_outlined,
-                    size: 80,
-                    color: Colors.grey.shade400,
+          ? AnimatedBuilder(
+              animation: _emptyStateController,
+              builder: (context, child) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Animated icon with pulse effect
+                      AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale:
+                                _scaleAnimation.value * _pulseAnimation.value,
+                            child: Opacity(
+                              opacity: _fadeAnimation.value,
+                              child: Icon(
+                                Icons.inbox_outlined,
+                                size: 80,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      // Animated title
+                      Transform.translate(
+                        offset: Offset(0, _slideAnimation.value),
+                        child: Opacity(
+                          opacity: _fadeAnimation.value,
+                          child: const Text(
+                            'No Messages from Members',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0A1F44),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Animated description
+                      Transform.translate(
+                        offset: Offset(0, _slideAnimation.value),
+                        child: Opacity(
+                          opacity: _fadeAnimation.value,
+                          child: Text(
+                            'Messages from members will appear here',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No Messages from Members',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0A1F44),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Messages from members will appear here',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
+                );
+              },
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -2155,10 +2391,14 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
             border: Border.all(
               color: hasReplies
                   ? Colors.green.shade200
-                  : (isRead ? Colors.grey.shade200 : const Color(0xFF0A1F44).withOpacity(0.3)),
+                  : (isRead
+                        ? Colors.grey.shade200
+                        : const Color(0xFF0A1F44).withOpacity(0.3)),
               width: isRead ? 1 : 2,
             ),
-            color: isRead ? Colors.white : const Color(0xFF0A1F44).withOpacity(0.02),
+            color: isRead
+                ? Colors.white
+                : const Color(0xFF0A1F44).withOpacity(0.02),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2173,7 +2413,9 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                     children: [
                       CircleAvatar(
                         radius: 24,
-                        backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
+                        backgroundColor: const Color(
+                          0xFF0A1F44,
+                        ).withOpacity(0.15),
                         child: Text(
                           senderInitials,
                           style: const TextStyle(
@@ -2378,10 +2620,13 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
         setState(() {
           _unreadFromMembersCount = response?['unread_count'] ?? 0;
           // Update message read status in local list
-          final index = _messagesFromMembers.indexWhere((m) => m['id'] == message['id']);
+          final index = _messagesFromMembers.indexWhere(
+            (m) => m['id'] == message['id'],
+          );
           if (index != -1) {
             _messagesFromMembers[index]['is_read'] = true;
-            _messagesFromMembers[index]['read_at'] = DateTime.now().toIso8601String();
+            _messagesFromMembers[index]['read_at'] = DateTime.now()
+                .toIso8601String();
           }
         });
       }
@@ -2397,6 +2642,10 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
     final senderName = message['sender']?['full_name'] ?? 'Member';
     final senderEmail = message['sender']?['email'] ?? '';
     final senderPhone = message['sender']?['telephone'] ?? '';
+    final senderEkanisa =
+        message['sender']?['e_kanisa_number'] ??
+        message['sender']?['ekanisa_number'] ??
+        '';
 
     showModalBottomSheet(
       context: context,
@@ -2502,109 +2751,35 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                 ],
               ),
             ),
-            // Content
+            // Content - WhatsApp-style conversation
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Message content
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+              child: Container(
+                color: Colors.grey.shade100,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      // Original message (from member) - shown as received
+                      _buildWhatsAppBubble(
+                        message: message['message'] ?? '',
+                        time: _formatTime(message['created_at']?.toString()),
+                        isSent: false,
+                        isRead: message['is_read'] == true,
+                        senderName: senderName,
                       ),
-                      child: Text(
-                        message['message'] ?? '',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.6,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Replies section
-                    if (message['replies'] != null &&
-                        (message['replies'] as List).isNotEmpty) ...[
-                      const Text(
-                        'Your Replies',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A1F44),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ...(message['replies'] as List).map(
-                        (reply) => Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade200),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _formatDate(reply['created_at']?.toString()),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.green.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                reply['message'] ?? '',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.green.shade900,
-                                ),
-                              ),
-                            ],
+                      // Replies (from elder) - shown as sent
+                      if (message['replies'] != null &&
+                          (message['replies'] as List).isNotEmpty)
+                        ...(message['replies'] as List).map(
+                          (reply) => _buildWhatsAppBubble(
+                            message: reply['message'] ?? '',
+                            time: _formatTime(reply['created_at']?.toString()),
+                            isSent: true,
+                            isRead: reply['is_read_by_recipient'] == true,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
                     ],
-                    // Details card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0A1F44).withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFF0A1F44).withOpacity(0.2),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildDetailRow(Icons.person, 'From', senderName),
-                          if (senderEmail.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            _buildDetailRow(Icons.email, 'Email', senderEmail),
-                          ],
-                          if (senderPhone.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            _buildDetailRow(Icons.phone, 'Phone', senderPhone),
-                          ],
-                          const SizedBox(height: 12),
-                          _buildDetailRow(
-                            Icons.access_time,
-                            'Sent',
-                            _formatDate(message['created_at']?.toString()),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

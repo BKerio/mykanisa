@@ -115,7 +115,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     return Scaffold(
       body: Container(
         width: double.infinity,
-        decoration: const BoxDecoration(color: Colors.white54),
+        decoration: const BoxDecoration(color: Colors.white),
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Column(
@@ -132,7 +132,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
               const Text(
                 'My Kanisa App',
                 style: TextStyle(
-                  color: Color(0xFF004D40),
+                  color: Color(0xFF0A1F44),
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
@@ -213,7 +213,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
                 style: TextStyle(color: Colors.white, fontSize: 16),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
+                backgroundColor: Color(0xFF0A1F44),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 12,

@@ -3,6 +3,7 @@ import 'package:pcea_church/screen/base_dashboard.dart';
 import 'package:pcea_church/screen/profile.dart';
 import 'package:pcea_church/screen/members.dart';
 import 'package:pcea_church/screen/elder_message_form.dart';
+import 'package:pcea_church/screen/church_contribution.dart';
 
 class ElderDashboard extends BaseDashboard {
   const ElderDashboard({super.key});
@@ -18,9 +19,9 @@ class ElderDashboard extends BaseDashboard {
   List<DashboardCard> getDashboardCards(BuildContext context) {
     return [
       DashboardCard(
-        icon: Icons.message_rounded,
-        title: 'Communication Modules',
-        color: Color(0xFF0A1F44),
+        icon: Icons.campaign_rounded,
+        title: 'Church Communication',
+        color: Colors.teal,
         subtitle: 'Save message to database',
         onTap: () {
           Navigator.push(
@@ -34,7 +35,7 @@ class ElderDashboard extends BaseDashboard {
       DashboardCard(
         icon: Icons.groups,
         title: 'Congregation Members',
-        color: Colors.indigo,
+        color: Colors.teal,
         subtitle: 'View your flock',
         onTap: () {
           Navigator.push(
@@ -45,8 +46,8 @@ class ElderDashboard extends BaseDashboard {
       ),
       DashboardCard(
         icon: Icons.event,
-        title: 'Manage Events & Ministries',
-        color: Colors.orange,
+        title: 'Manage Church Calender',
+        color: Colors.teal,
         subtitle: 'Oversee church activities',
         onTap: () {
           Navigator.push(
@@ -58,7 +59,7 @@ class ElderDashboard extends BaseDashboard {
       DashboardCard(
         icon: Icons.wallet_giftcard_rounded,
         title: ' Church Contributions',
-        color: Colors.green,
+        color: Colors.teal,
         subtitle: 'View records',
         onTap: () {
           Navigator.push(
@@ -76,7 +77,10 @@ class ElderDashboard extends BaseDashboard {
   List<BottomNavigationBarItem> getBottomNavItems() {
     return const [
       BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-      BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.calendar_today),
+        label: "church Calender",
+      ),
       BottomNavigationBarItem(icon: Icon(Icons.group), label: "Members"),
       BottomNavigationBarItem(icon: Icon(Icons.business), label: "Board"),
       BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),
@@ -126,37 +130,6 @@ class ElderMemberViewScreen extends StatelessWidget {
   }
 }
 
-class ElderContributionsScreen extends StatelessWidget {
-  const ElderContributionsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contributions'),
-        backgroundColor: const Color(0xFF2E7D32),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.account_balance_wallet, size: 100, color: Colors.grey),
-            SizedBox(height: 20),
-            Text(
-              'Contributions Overview',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'View contribution records and statistics',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class ChurchBoardScreen extends StatelessWidget {
   const ChurchBoardScreen({super.key});

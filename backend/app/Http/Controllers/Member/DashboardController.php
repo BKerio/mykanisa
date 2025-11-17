@@ -262,9 +262,11 @@ class DashboardController extends Controller
             $memberName = $member->full_name ?? ($user instanceof \App\Models\Member ? $user->full_name : 'Member');
             if ($elder && $elder->telephone) {
                 $smsService = app(\App\Services\SmsService::class);
-                $smsMessage = "Reply from {$memberName}\n\n";
+                $smsMessage = "Hello {$elder->full_name},\n\n";
+                $smsMessage .= "Reply from {$memberName}:\n\n";
                 $smsMessage .= "Re: {$originalAnnouncement->title}\n\n";
                 $smsMessage .= $validated['message'];
+                $smsMessage .= "\n\n- PCEA Church";
                 $smsService->sendSms($elder->telephone, $smsMessage);
             }
         } catch (\Exception $e) {
@@ -389,9 +391,12 @@ class DashboardController extends Controller
         try {
             if ($elder->telephone) {
                 $smsService = app(\App\Services\SmsService::class);
-                $smsMessage = "Message from {$member->full_name}\n\n";
+                $memberName = $member->full_name ?? 'Member';
+                $smsMessage = "Hello {$elder->full_name},\n\n";
+                $smsMessage .= "Message from {$memberName}:\n\n";
                 $smsMessage .= "Subject: {$validated['title']}\n\n";
                 $smsMessage .= $validated['message'];
+                $smsMessage .= "\n\n- PCEA Church";
                 $smsService->sendSms($elder->telephone, $smsMessage);
             }
         } catch (\Exception $e) {

@@ -26,6 +26,7 @@ class RegionsSeeder extends Seeder
                     ["presbytery_name" => "KOMOTHAI PRESBYTERY","parishes" => ["PCEA Komothai Parish","PCEA Kiratina Parish","PCEA Gathugu Parish","PCEA Kibichoi Parish"]],
                     ["presbytery_name" => "LIMURU PRESBYTERY","parishes" => ["PCEA Limuru Parish","PCEA Narok Parish","PCEA Mirithu Parish","PCEA THIGIO Parish","PCEA Githunguchu Parish","PCEA Rironi Parish","PCEA Joshua Matenjwa Parish"]],
                     ["presbytery_name" => "LARI PRESBYTERY","parishes" => ["PCEA Ngarariga Parish","PCEA Lari Parish","PCEA Uplands Parish"]],
+                    ["presbytery_name" => "RUNGIRI PRESBYTERY","parishes" => ["PCEA Kinoo Parish"]],
                     ["presbytery_name" => "NGECHA PRESBYTERY","parishes" => ["PCEA Ngecha Parish","PCEA Kahuho Parish","PCEA Nyathuna Parish","PCEA Kabuku Parish","PCEA RedHill Parish"]],
                     ["presbytery_name" => "MUGUGA PRESBYTERY","parishes" => ["PCEA Muguga Parish","PCEA Sigona Parish","PCEA Nderi Parish","PCEA Kerwa Parish","PCEA Thamanda Parish","PCEA Mai Mahiu outreach"]],
                     ["presbytery_name" => "MURANG'A PRESBYTERY","parishes" => ["PCEA Kamahuha Parish","PCEA Kandani Parish","PCEA Murang'a Parish","PCEA Muthithi Parish","PCEA Nginda Parish","PCEA Kaharati Parish","PCEA Makuyu Parish","PCEA Kangema Parish","PCEA Ithanga Nendeni Area"]]
