@@ -10,7 +10,6 @@ import {
   Building2,
   Church,
   ArrowRight,
-  Currency,
   EuroIcon,
   Settings
 } from 'lucide-react';
