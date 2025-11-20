@@ -16,7 +16,6 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
   List<Map<String, dynamic>> _payments = [];
   List<String> _congregations = [];
   bool _isLoading = true;
-  bool _isLoadingCongregations = false;
   String? _error;
   String _searchQuery = '';
   String? _selectedCongregation;
@@ -43,9 +42,7 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
   }
 
   Future<void> _loadCongregations() async {
-    setState(() {
-      _isLoadingCongregations = true;
-    });
+    setState(() {});
 
     try {
       final result = await API().getRequest(
@@ -58,18 +55,13 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
         final response = jsonDecode(result.body);
         setState(() {
           _congregations = List<String>.from(response);
-          _isLoadingCongregations = false;
         });
       } else {
-        setState(() {
-          _isLoadingCongregations = false;
-        });
+        setState(() {});
       }
     } catch (e) {
       debugPrint('Error loading congregations: $e');
-      setState(() {
-        _isLoadingCongregations = false;
-      });
+      setState(() {});
     }
   }
 

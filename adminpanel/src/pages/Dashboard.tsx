@@ -3,15 +3,16 @@ import { useOutletContext, Link } from 'react-router-dom';
 import axios from 'axios';
 import {
   Users,
-  Building, // Replaced DollarSign & BarChart2 for new stat card
+  Building, 
   UserPlus,
-  Loader2,
   AlertTriangle,
-  LucideUserCircle2,
   FileText,
   MapPin,
   Building2,
   Church,
+  ArrowUpRight,
+  Calendar,
+  ChevronRight
 } from 'lucide-react';
 import {
   PieChart,
@@ -21,6 +22,9 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import { motion } from 'framer-motion';
+import dayjs from 'dayjs';
+import DashboardLoader from '@/lib/loader'; // Adjust path as needed
 
 // --- TYPE DEFINITIONS ---
 interface UserProfile {
@@ -41,6 +45,7 @@ interface StatCardData {
 
 interface QuickActionData {
   text: string;
+  desc: string;
   icon: React.ElementType;
   path: string;
 }
@@ -49,8 +54,6 @@ interface MemberDto {
   id: number;
   full_name: string;
   e_kanisa_number?: string;
-  telephone?: string;
-  email?: string;
   congregation: string;
 }
 
@@ -81,22 +84,70 @@ interface PaginatedResponse<T> {
   total: number;
 }
 
-// --- HELPER FUNCTIONS ---
+// --- CONSTANTS & HELPERS ---
+const BLUE_PALETTE = [
+  '#172554', // blue-950
+  '#1e40af', // blue-800
+  '#2563eb', // blue-600
+  '#60a5fa', // blue-400
+  '#93c5fd', // blue-300
+  '#cbd5e1', // slate-300
+];
+
 const getGreeting = () => {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return { text: 'Good Morning'};
-  if (hour >= 12 && hour < 15) return { text: 'Good Afternoon'};
-  return { text: 'Good Evening'};
+  if (hour >= 5 && hour < 12) return 'Good Morning';
+  if (hour >= 12 && hour < 18) return 'Good Afternoon';
+  return 'Good Evening';
 };
 
-const greeting = getGreeting();
-const COLORS = ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#F43F5E'];
+// --- SUB-COMPONENTS ---
+
+// 1. Stat Card
+const StatCard = ({ stat, index }: { stat: StatCardData; index: number }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: index * 0.1 }}
+    className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-300 group"
+  >
+    <div className="flex justify-between items-start">
+      <div>
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{stat.title}</p>
+        <h3 className="text-3xl font-bold text-slate-900 group-hover:text-blue-900 transition-colors">{stat.value}</h3>
+      </div>
+      <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-blue-50 group-hover:text-blue-600 text-slate-400 transition-colors">
+        <stat.icon className="w-6 h-6" />
+      </div>
+    </div>
+    <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+      {stat.change}
+    </div>
+  </motion.div>
+);
+
+// 2. Custom Tooltip for Chart
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900 text-white text-xs p-3 rounded-lg shadow-xl border border-slate-700">
+        <p className="font-bold mb-1">{payload[0].name}</p>
+        <p className="text-blue-200">{payload[0].value} Members</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// --- MAIN COMPONENT ---
 
 const Dashboard = () => {
   const { user } = useOutletContext<OutletContextType>();
+  
+  // State
   const [stats, setStats] = useState<StatCardData[] | null>(null);
   const [members, setMembers] = useState<MemberDto[]>([]);
-  const [membersTotal, setMembersTotal] = useState<number>(0);
   const [regions, setRegions] = useState<Region[]>([]);
   const [presbyteries, setPresbyteries] = useState<Presbytery[]>([]);
   const [parishes, setParishes] = useState<Parish[]>([]);
@@ -106,20 +157,17 @@ const Dashboard = () => {
   const API_URL = import.meta.env.VITE_API_URL;
 
   const quickActions: QuickActionData[] = [
-    { text: 'Register New Member', icon: UserPlus, path: '/dashboard/members' },
-    { text: 'View All Members', icon: Users, path: '/dashboard/members' },
-    { text: 'Manage Regions', icon: MapPin, path: '/dashboard/regions' },
-    { text: 'Manage Presbyteries', icon: Building2, path: '/dashboard/presbyteries' },
-    { text: 'Manage Parishes', icon: Church, path: '/dashboard/parishes' },
-    { text: 'Manage Groups', icon: Building, path: '/dashboard/groups' },
-    { text: 'View Contributions', icon: FileText, path: '/dashboard/contributions' },
+    { text: 'New Member', desc: 'Register profile', icon: UserPlus, path: '/dashboard/members' },
+    { text: 'Directory', desc: 'View all', icon: Users, path: '/dashboard/members' },
+    { text: 'Finance', desc: 'Contributions', icon: FileText, path: '/dashboard/contributions' },
+    { text: 'Structure', desc: 'Manage Regions', icon: MapPin, path: '/dashboard/regions' },
   ];
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       const token = localStorage.getItem('token');
       if (!token) {
-        setError("Authentication error. Please log in again.");
+        setError("Authentication error. Please log in.");
         setLoading(false);
         return;
       }
@@ -127,280 +175,260 @@ const Dashboard = () => {
       try {
         const headers = { Authorization: `Bearer ${token}` };
         
-        // Fetch all data in parallel
-        const [membersResponse, regionsResponse, presbyteriesResponse, parishesResponse] = await Promise.all([
-          axios.get<PaginatedResponse<MemberDto>>(
-            `${API_URL}/admin/members?per_page=1000`,
-            { headers }
-          ),
-          axios.get<PaginatedResponse<Region>>(
-            `${API_URL}/admin/regions?per_page=1000`,
-            { headers }
-          ),
-          axios.get<PaginatedResponse<Presbytery>>(
-            `${API_URL}/admin/presbyteries?per_page=1000`,
-            { headers }
-          ),
-          axios.get<PaginatedResponse<Parish>>(
-            `${API_URL}/admin/parishes?per_page=1000`,
-            { headers }
-          ),
+        const [membersRes, regionsRes, presbyteriesRes, parishesRes] = await Promise.all([
+          axios.get<PaginatedResponse<MemberDto>>(`${API_URL}/admin/members?per_page=1000`, { headers }),
+          axios.get<PaginatedResponse<Region>>(`${API_URL}/admin/regions?per_page=1000`, { headers }),
+          axios.get<PaginatedResponse<Presbytery>>(`${API_URL}/admin/presbyteries?per_page=1000`, { headers }),
+          axios.get<PaginatedResponse<Parish>>(`${API_URL}/admin/parishes?per_page=1000`, { headers }),
         ]);
 
-        // Process Members
-        const fetchedMembers = membersResponse.data.data;
-        const totalMembers = membersResponse.data.total;
-        const uniqueCongregations = new Set(fetchedMembers.map(m => m.congregation)).size;
+        const mData = membersRes.data.data;
+        const totalM = membersRes.data.total;
+        const uniqueCongregations = new Set(mData.map(m => m.congregation)).size;
 
-        // Process Regions
-        const fetchedRegions = regionsResponse.data.data || [];
-        const totalRegions = regionsResponse.data.total || 0;
+        const rData = regionsRes.data.data || [];
+        const pData = presbyteriesRes.data.data || [];
+        const parishData = parishesRes.data.data || [];
 
-        // Process Presbyteries
-        const fetchedPresbyteries = presbyteriesResponse.data.data || [];
-        const totalPresbyteries = presbyteriesResponse.data.total || 0;
+        setStats([
+          { title: 'Total Membership', value: totalM.toString(), change: `${uniqueCongregations} Active Congregations`, icon: Users },
+          { title: 'Regions', value: rData.length.toString(), change: 'Geographical Areas', icon: MapPin },
+          { title: 'Presbyteries', value: pData.length.toString(), change: 'Administrative Units', icon: Building2 },
+          { title: 'Parishes', value: parishData.length.toString(), change: 'Local Assemblies', icon: Church },
+        ]);
 
-        // Process Parishes
-        const fetchedParishes = parishesResponse.data.data || [];
-        const totalParishes = parishesResponse.data.total || 0;
-
-        // Create Stat Cards
-        const statsData: StatCardData[] = [
-          {
-            title: 'Total Members Registered',
-            value: totalMembers.toString(),
-            change: `In ${uniqueCongregations} congregations`,
-            icon: Users,
-          },
-          {
-            title: 'Total Regions',
-            value: totalRegions.toString(),
-            change: `${totalPresbyteries} presbyteries`,
-            icon: MapPin,
-          },
-          {
-            title: 'Total Presbyteries',
-            value: totalPresbyteries.toString(),
-            change: `${totalParishes} parishes`,
-            icon: Building2,
-          },
-          {
-            title: 'Total Parishes',
-            value: totalParishes.toString(),
-            change: 'Across all regions',
-            icon: Church,
-          },
-        ];
-
-        setMembers(fetchedMembers);
-        setMembersTotal(totalMembers);
-        setRegions(fetchedRegions);
-        setPresbyteries(fetchedPresbyteries);
-        setParishes(fetchedParishes);
-        setStats(statsData);
+        setMembers(mData);
+        setRegions(rData);
+        setPresbyteries(pData);
+        setParishes(parishData);
 
       } catch (err) {
-        console.error("Error loading dashboard:", err);
-        setError("Could not load dashboard data. Please try again later.");
+        setError("Unable to sync dashboard data.");
       } finally {
-        setLoading(false);
+        // Minimum loading time to see the animation
+        setTimeout(() => setLoading(false), 800);
       }
     };
 
     fetchDashboardData();
   }, [API_URL]);
 
-  // Chart Data: Members by Congregation
+  // Process Chart Data
   const congregationData = Object.entries(
     members.reduce((acc, curr) => {
-      const congregation = curr.congregation || 'Unknown';
-      acc[congregation] = (acc[congregation] || 0) + 1;
+      const c = curr.congregation || 'Unknown';
+      acc[c] = (acc[c] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
-  ).map(([name, value]) => ({ name, value }));
+  )
+  .map(([name, value]) => ({ name, value }))
+  .sort((a, b) => b.value - a.value) // Sort by size
+  .slice(0, 6); // Top 6 only
 
+  // --- LOAD STATE ---
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-indigo-200 p-4">
-        <Loader2 className="w-24 h-24 text-green-600 animate-spin" />
-        <p className="mt-4 text-lg text-slate-600 font-semibold">Loading your dashboard...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <DashboardLoader 
+          title="Syncing Dashboard" 
+          subtitle="Gathering metrics, structure data, and membership records..." 
+        />
       </div>
     );
   }
 
+  // --- ERROR STATE ---
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-red-100 to-pink-200 p-4 text-center">
-        <AlertTriangle className="w-12 h-12 text-red-600" />
-        <p className="mt-4 text-xl font-bold text-red-700">Oops!</p>
-        <p className="mt-2 text-slate-700">{error}</p>
+      <div className="flex flex-col items-center justify-center min-h-[80vh] p-4">
+        <div className="bg-red-50 p-6 rounded-2xl border border-red-100 text-center max-w-md">
+          <AlertTriangle className="w-12 h-12 text-red-900 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-red-900">Dashboard Error</h3>
+          <p className="text-red-700 mt-2 text-sm">{error}</p>
+        </div>
       </div>
     );
   }
 
+  // --- MAIN UI ---
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {/* Greeting Section */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-pink-600/10 rounded-3xl"></div>
-          <div className="relative bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-8 rounded-3xl border border-white/20 dark:border-slate-700/50 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-4xl font-bold bg-blue-800 dark:bg-slate-200 bg-clip-text text-transparent">
-                  {greeting.text}, <span className="text-blue-600 dark:text-blue-400">{user.name}</span>
-                </h1>
-                <p className="mt-3 text-lg text-slate-600 dark:text-slate-300 font-medium">
-                  Welcome back! Here's your ministry overview at a glance.
-                </p>
-              </div>
-              
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-slate-50/50 p-6 md:p-8 font-sans text-slate-900">
+      
+      {/* 1. Header / Welcome */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+          <p className="text-slate-500 font-medium mb-1 flex items-center gap-2">
+             <Calendar className="w-4 h-4" /> {dayjs().format('dddd, D MMMM YYYY')}
+          </p>
+          <h1 className="text-3xl font-bold text-slate-900">
+            {getGreeting()}, <span className="text-blue-900">{user.name.split(' ')[0]}</span>
+          </h1>
+        </motion.div>
+        
+        <motion.div 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full shadow-sm text-sm font-medium text-slate-600"
+        >
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          System Operational
+        </motion.div>
+      </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats?.map((stat, index) => (
-            <div key={index} className="group relative overflow-hidden bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm p-6 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg"><stat.icon className="w-6 h-6" /></div>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide text-right">{stat.title}</p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-3xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <p className="text-sm font-medium text-green-600 dark:text-green-400">{stat.change}</p>
+      {/* 2. Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {stats?.map((stat, index) => (
+          <StatCard key={index} stat={stat} index={index} />
+        ))}
+      </div>
+
+      {/* 3. Main Bento Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* LEFT COLUMN (2/3 Width) */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* A. Quick Actions */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {quickActions.map((action, idx) => (
+              <Link key={idx} to={action.path}>
+                <motion.div 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center gap-3"
+                >
+                  <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-blue-900 group-hover:bg-blue-900 group-hover:text-white transition-colors">
+                    <action.icon className="w-6 h-6" />
                   </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Main Content: Quick Actions & Members Overview */}
-        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm p-6 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Quick Actions */}
-                <div>
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Quick Actions</h2>
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    </div>
-                    <div className="space-y-3">
-                    {quickActions.map((action, index) => (
-                        <Link key={index} to={action.path} className="group flex items-center gap-4 p-4 bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-700/50 dark:to-blue-900/20 rounded-xl hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30 transition-all duration-200 border border-slate-200/50 dark:border-slate-600/50 hover:border-blue-300/50 dark:hover:border-blue-600/50 hover:shadow-md">
-                        <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md group-hover:shadow-lg transition-shadow duration-200"><action.icon className="w-6 h-6 text-white" /></div>
-                        <div className="flex-1"><span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors duration-200">{action.text}</span><p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Click to proceed</p></div>
-                        </Link>
-                    ))}
-                    </div>
-                </div>
-
-                {/* New Members List */}
-                <div>
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white">New Members</h3>
-                        <Link to="/members" className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-medium rounded-full hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors">{membersTotal} total</Link>
-                    </div>
-                    <div className="space-y-3 max-h-[24.5rem] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent pr-2">
-                    {members.slice(0, 15).map((m) => (
-                        <div key={m.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">{m.full_name.charAt(0).toUpperCase()}</div>
-                        <div className="flex-1 min-w-0">
-                            <p className="font-medium text-slate-900 dark:text-white truncate">{m.full_name}</p>
-                            <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400"><span>{m.congregation || 'No Congregation'}</span></div>
-                        </div>
-                        </div>
-                    ))}
-                    {members.length === 0 && (
-                        <div className="text-center py-8">
-                        <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-3"><LucideUserCircle2 className="w-6 h-6 text-slate-400 dark:text-slate-500" /></div>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm">No members found</p>
-                        </div>
-                    )}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Member Distribution by Congregation */}
-          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm p-8 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-lg">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Members by Congregation</h2>
-                <p className="text-slate-600 dark:text-slate-400 mt-2">Distribution of members across different congregations</p>
-              </div>
-              <div className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-full">Total {membersTotal} Members</div>
-            </div>
-            <ResponsiveContainer width="100%" height={400}>
-              <PieChart>
-                <Pie data={congregationData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} innerRadius={60} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                  {congregationData.map((_, index) => (<Cell key={index} fill={COLORS[index % COLORS.length]} />))}
-                </Pie>
-                <Tooltip formatter={(value, name) => [`${value} members`, name]}/>
-                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '14px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">{action.text}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">{action.desc}</p>
+                  </div>
+                </motion.div>
+              </Link>
+            ))}
           </div>
 
-          {/* Regions Overview */}
-          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm p-8 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
+          {/* B. Analytics Chart */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
+          >
+            <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Regions Overview</h2>
-                <p className="text-slate-600 dark:text-slate-400 mt-2">Church structure hierarchy</p>
+                 <h3 className="font-bold text-lg text-slate-900">Congregation Distribution</h3>
+                 <p className="text-sm text-slate-500">Membership breakdown by branch</p>
               </div>
-              <Link to="/dashboard/regions" className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-full hover:from-green-600 hover:to-emerald-700 transition-colors">
-                Manage
+              <button className="p-2 hover:bg-slate-50 rounded-lg transition-colors">
+                 <ArrowUpRight className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={congregationData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {congregationData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={BLUE_PALETTE[index % BLUE_PALETTE.length]} stroke="none" />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36} 
+                    iconType="circle"
+                    formatter={(value) => <span className="text-slate-600 text-xs font-medium ml-1">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* RIGHT COLUMN (1/3 Width) */}
+        <div className="space-y-8">
+          
+          {/* A. Recent Members List */}
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+          >
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-bold text-slate-900">Recent Members</h3>
+              <Link to="/dashboard/members" className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center">
+                View All <ChevronRight className="w-3 h-3 ml-1" />
               </Link>
             </div>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent pr-2">
-              {regions.length === 0 ? (
-                <div className="text-center py-8">
-                  <MapPin className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">No regions found</p>
+            <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto">
+              {members.slice(0, 7).map((m) => (
+                <div key={m.id} className="p-4 flex items-center gap-3 hover:bg-slate-50 transition-colors">
+                   <div className="w-10 h-10 rounded-full bg-blue-950 text-white flex items-center justify-center text-xs font-bold">
+                      {m.full_name.substring(0, 2).toUpperCase()}
+                   </div>
+                   <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">{m.full_name}</p>
+                      <p className="text-xs text-slate-500 truncate">{m.congregation || 'Unassigned'}</p>
+                   </div>
+                   <div className="w-2 h-2 rounded-full bg-blue-400"></div>
                 </div>
-              ) : (
-                regions.map((region) => {
-                  const regionPresbyteries = presbyteries.filter(p => p.region_id === region.id);
-                  const regionParishes = parishes.filter(p => 
-                    regionPresbyteries.some(pres => pres.id === p.presbytery_id)
-                  );
-                  
-                  return (
-                    <div key={region.id} className="p-4 bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-700/50 dark:to-blue-900/20 rounded-xl border border-slate-200/50 dark:border-slate-600/50 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-5 h-5 text-blue-600" />
-                          <h3 className="font-bold text-slate-900 dark:text-white">{region.name}</h3>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mt-3">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Building2 className="w-4 h-4 text-indigo-600" />
-                          <span className="text-slate-600 dark:text-slate-400">
-                            <strong className="text-slate-900 dark:text-white">{regionPresbyteries.length}</strong> Presbytery{regionPresbyteries.length !== 1 ? 'ies' : ''}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Church className="w-4 h-4 text-green-600" />
-                          <span className="text-slate-600 dark:text-slate-400">
-                            <strong className="text-slate-900 dark:text-white">{regionParishes.length}</strong> Parishes
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+              ))}
             </div>
-          </div>
+          </motion.div>
+
+          {/* B. Hierarchy Summary */}
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-blue-950 rounded-2xl shadow-lg p-6 text-white relative overflow-hidden"
+          >
+             <div className="absolute top-0 right-0 opacity-10 transform translate-x-8 -translate-y-8">
+                <Building size={150} />
+             </div>
+             
+             <div className="relative z-10">
+               <h3 className="font-bold text-lg mb-1">Structure Status</h3>
+               <p className="text-blue-200 text-xs mb-6">Overview of administrative units</p>
+               
+               <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b border-blue-800 pb-2">
+                     <span className="text-sm text-blue-100 flex items-center gap-2">
+                        <MapPin className="w-4 h-4" /> Regions
+                     </span>
+                     <span className="font-bold">{regions.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-blue-800 pb-2">
+                     <span className="text-sm text-blue-100 flex items-center gap-2">
+                        <Building2 className="w-4 h-4" /> Presbyteries
+                     </span>
+                     <span className="font-bold">{presbyteries.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                     <span className="text-sm text-blue-100 flex items-center gap-2">
+                        <Church className="w-4 h-4" /> Parishes
+                     </span>
+                     <span className="font-bold">{parishes.length}</span>
+                  </div>
+               </div>
+
+               <Link to="/dashboard/regions" className="mt-6 w-full py-2 bg-white text-blue-950 text-sm font-bold rounded-lg flex items-center justify-center hover:bg-blue-50 transition-colors">
+                  Manage Structure
+               </Link>
+             </div>
+          </motion.div>
+
         </div>
       </div>
     </div>

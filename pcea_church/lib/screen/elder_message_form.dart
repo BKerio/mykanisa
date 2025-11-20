@@ -2641,11 +2641,6 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
 
     final senderName = message['sender']?['full_name'] ?? 'Member';
     final senderEmail = message['sender']?['email'] ?? '';
-    final senderPhone = message['sender']?['telephone'] ?? '';
-    final senderEkanisa =
-        message['sender']?['e_kanisa_number'] ??
-        message['sender']?['ekanisa_number'] ??
-        '';
 
     showModalBottomSheet(
       context: context,

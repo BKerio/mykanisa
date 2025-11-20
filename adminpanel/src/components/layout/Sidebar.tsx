@@ -9,7 +9,10 @@ import {
   MapPin,
   Building2,
   Church,
+  ArrowRight,
+  Currency
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface UserProfile {
   name: string;
@@ -17,38 +20,42 @@ interface UserProfile {
 }
 
 interface SidebarProps {
-  user: UserProfile;
+  user: UserProfile; // Kept in interface just in case needed for future logic, though visuals are removed
   sidebarOpen: boolean;
   isMobile: boolean;
   onLogout: () => void;
   onCloseMobile: () => void;
 }
 
-const Sidebar = ({ user, sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProps) => {
+const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProps) => {
   const location = useLocation();
 
   const sidebarNavLinks = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { name: 'Registered Members', icon: LucideUserCircle2, path: '/dashboard/members' },
-    { name: 'View All Congregation', icon: ChurchIcon, path: '/dashboard/congregations' },
-    { name: 'View Contributions', icon: ChurchIcon, path: '/dashboard/contributions' },
-    { name: 'Manage Church Groups', icon: Users, path: '/dashboard/groups' },
-    { name: 'Manage Regions', icon: MapPin, path: '/dashboard/regions' },
-    { name: 'Manage Presbyteries', icon: Building2, path: '/dashboard/presbyteries' },
-    { name: 'Manage Parishes', icon: Church, path: '/dashboard/parishes' },
-
+    { name: 'Congregations', icon: ChurchIcon, path: '/dashboard/congregations' },
+    { name: 'Contributions', icon: Currency, path: '/dashboard/contributions' },
+    { name: 'Church Groups', icon: Users, path: '/dashboard/groups' },
+    { name: 'Regions', icon: MapPin, path: '/dashboard/regions' },
+    { name: 'Presbyteries', icon: Building2, path: '/dashboard/presbyteries' },
+    { name: 'Parishes', icon: Church, path: '/dashboard/parishes' },
   ];
 
   const handleLogout = async () => {
     const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: 'You will be logged out from your session.',
+      title: 'Ready to leave?',
+      text: 'You are about to sign out of the admin panel.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, logout',
-      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sign Out',
+      cancelButtonText: 'Stay',
+      customClass: {
+        popup: 'rounded-3xl',
+        confirmButton: 'rounded-xl px-6',
+        cancelButton: 'rounded-xl px-6'
+      }
     });
 
     if (result.isConfirmed) {
@@ -56,123 +63,183 @@ const Sidebar = ({ user, sidebarOpen, isMobile, onLogout, onCloseMobile }: Sideb
     }
   };
 
+  // Framer Motion Variants
+  const sidebarVariants = {
+    expanded: { width: 260 },
+    collapsed: { width: 88 },
+    mobileOpen: { x: 0, width: 260 },
+    mobileClosed: { x: "-100%", width: 260 }
+  };
+
+  const navItemVariants = {
+    hidden: { opacity: 0, x: -10 },
+    visible: (i: number) => ({
+      opacity: 1,
+      x: 0,
+      transition: { delay: i * 0.05 }
+    })
+  };
+
   return (
-    <aside
-      className={`
-        bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900
-        shadow-2xl border-r border-slate-200/50 dark:border-slate-700/50 transition-all duration-300 z-50 flex flex-col
-        ${isMobile ? 'fixed top-0 left-0 h-full' : 'relative h-full'}
-        ${isMobile && !sidebarOpen ? '-translate-x-full' : ''}
-      `}
-    >
-      <div className="flex flex-col h-full overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
+    <>
+      {/* Mobile Backdrop */}
+      <AnimatePresence>
+        {isMobile && sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onCloseMobile}
+            className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm"
+          />
+        )}
+      </AnimatePresence>
 
-        {/* Enhanced Profile Header */}
-        <div className="sticky top-0 z-10 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200/50 dark:border-slate-700/50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-shrink-0">
-              <img
-                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=3b82f6&color=fff&size=40`}
-                alt="avatar"
-                className="w-10 h-10 rounded-xl shadow-lg ring-2 ring-blue-500/20"
-              />
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-800"></div>
-            </div>
-            <div className={`overflow-hidden transition-all duration-300 ${!sidebarOpen && 'md:opacity-0 md:w-0'}`}>
-              <h3 className="font-bold text-slate-900 dark:text-white truncate text-base">{user.name}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
-              <div className="flex items-center gap-1 mt-1">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                <span className="text-xs text-green-600 dark:text-green-400 font-medium">Online</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <motion.aside
+        initial={isMobile ? "mobileClosed" : (sidebarOpen ? "expanded" : "collapsed")}
+        animate={isMobile ? (sidebarOpen ? "mobileOpen" : "mobileClosed") : (sidebarOpen ? "expanded" : "collapsed")}
+        variants={sidebarVariants}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className={`
+          fixed md:relative z-50 h-full
+          bg-white dark:bg-slate-950
+          border-r border-slate-200 dark:border-slate-800
+          flex flex-col shadow-2xl md:shadow-none
+        `}
+      >
+        {/* Top Spacing / Decorative Element */}
+        <div className="h-6 w-full" />
 
-        {/* Enhanced Navigation Links */}
-        <nav className="flex-grow p-3 space-y-1">
-          {sidebarNavLinks.map((link) => {
+        {/* Navigation Area */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-4 space-y-2 custom-scrollbar">
+          
+          {/* Section Label (Only visible when expanded) */}
+          <AnimatePresence>
+            {sidebarOpen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="px-2 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider"
+              >
+                Main Menu
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {sidebarNavLinks.map((link, i) => {
             const isActive = location.pathname === link.path;
+            
             return (
               <Link
-                key={link.name}
+                key={link.path}
                 to={link.path}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative overflow-hidden
-                  ${isActive
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/50 dark:hover:text-white'}
-                  ${!sidebarOpen && 'md:justify-center md:px-2'}
-                `}
                 onClick={isMobile ? onCloseMobile : undefined}
-                title={!sidebarOpen ? link.name : undefined}
+                className="block relative group"
               >
-                {/* Active indicator */}
-                {isActive && (
-                  <span className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full shadow-lg"></span>
-                )}
-                
-                {/* Icon container */}
-                <div className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 flex-shrink-0 ${
-                  isActive 
-                    ? 'bg-white/20' 
-                    : 'bg-slate-100 dark:bg-slate-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30'
-                }`}>
-                  <link.icon className={`h-4 w-4 transition-all duration-200 ${
-                    isActive 
-                      ? 'text-white' 
-                      : 'text-slate-600 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400'
-                  } group-hover:scale-110`} />
-                </div>
-                
-                {/* Text */}
-                <span className={`font-medium text-sm transition-all duration-300 ${
-                  !sidebarOpen && 'md:w-0 md:opacity-0 md:overflow-hidden'
-                }`}>
-                  {link.name}
-                </span>
-                
-                {/* Hover indicator */}
-                {!isActive && (
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-auto">
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                  </div>
-                )}
+                <motion.div
+                  custom={i}
+                  variants={navItemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className={`
+                    relative flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-300
+                    ${isActive 
+                      ? 'bg-blue-50/80 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' 
+                      : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+                    }
+                    ${!sidebarOpen ? 'justify-center' : ''}
+                  `}
+                >
+                  {/* Active "Glow" Line */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeIndicator"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-r-full shadow-[0_0_12px_rgba(59,130,246,0.6)]"
+                    />
+                  )}
+
+                  {/* Icon */}
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="relative z-10"
+                  >
+                    <link.icon 
+                      className={`w-[22px] h-[22px] transition-all duration-300 ${isActive ? 'stroke-[2.5px]' : 'stroke-[1.5px]'}`} 
+                    />
+                  </motion.div>
+
+                  {/* Text Label */}
+                  <AnimatePresence mode="wait">
+                    {sidebarOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, x: -5 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, display: 'none' }}
+                        transition={{ duration: 0.2 }}
+                        className="font-medium text-[15px] whitespace-nowrap flex-1 tracking-tight"
+                      >
+                        {link.name}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Active Arrow (Subtle detail) */}
+                  {sidebarOpen && isActive && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-blue-400"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </motion.div>
+                  )}
+
+                  {/* Floating Tooltip for Collapsed State */}
+                  {!sidebarOpen && !isMobile && (
+                     <div className="absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 translate-x-2 group-hover:translate-x-0 shadow-xl z-50 whitespace-nowrap">
+                       {link.name}
+                       {/* Tiny Triangle Pointer */}
+                       <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-slate-900 dark:border-r-white" />
+                     </div>
+                  )}
+                </motion.div>
               </Link>
             );
           })}
-        </nav>
+        </div>
 
-        {/* Enhanced Logout */}
-        <div className="p-3 border-t border-slate-200/50 dark:border-slate-700/50">
+        {/* Footer Area */}
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800/50">
           <button
             onClick={handleLogout}
             className={`
-              group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative overflow-hidden
-              text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300
-              ${!sidebarOpen && 'md:justify-center md:px-2'}
+              relative w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-300 group overflow-hidden
+              hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-400 hover:text-red-500 dark:hover:text-red-400
+              ${!sidebarOpen ? 'justify-center' : ''}
             `}
-            title={!sidebarOpen ? 'Logout' : undefined}
           >
-            {/* Icon container */}
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 group-hover:bg-red-200 dark:group-hover:bg-red-900/40 transition-all duration-200 flex-shrink-0">
-              <LogOut className="h-4 w-4 transition-all duration-200 group-hover:scale-110" />
+            <div className="relative z-10">
+               <LogOut className="w-[22px] h-[22px] stroke-[1.5px] group-hover:stroke-[2px] transition-all" />
             </div>
             
-            {/* Text */}
-            <span className={`font-medium text-sm transition-all duration-300 ${
-              !sidebarOpen && 'md:w-0 md:opacity-0 md:overflow-hidden'
-            }`}>
-              Logout
-            </span>
+            {sidebarOpen && (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="font-medium text-[15px] whitespace-nowrap z-10"
+              >
+                Log Out
+              </motion.span>
+            )}
             
-            {/* Hover indicator */}
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-auto">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-            </div>
+            {/* Background hover fill effect */}
+            <div className="absolute inset-0 bg-red-50 dark:bg-red-900/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
           </button>
         </div>
-      </div>
-    </aside>
+      </motion.aside>
+    </>
   );
 };
 

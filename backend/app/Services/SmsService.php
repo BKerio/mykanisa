@@ -22,16 +22,16 @@ class SmsService
             $msisdn = $this->normalizeMsisdn($phoneNumber);
 
             $payload = [
-                'apikey'    => 'a03277821205d90e5d4bbfce7701a819',
-                'partnerID' => '4209',
+                'apikey'    => '9af6688adb82a80faa17c5066ab12b20',
+                'partnerID' => '4889',
                 'message'   => $message,
-                'shortcode' => 'TELENOR',
+                'shortcode' => 'P.C.E.A_SGM',
                 'mobile'    => $msisdn,
                 'msisdn'    => $msisdn,
             ];
 
             $response = $this->httpClient->post(
-                'https://quicksms.advantasms.com/api/services/sendsms/',
+                'https://bulksms.fornax-technologies.com/api/services/sendsms/',
                 [
                     'form_params' => $payload,
                     'headers' => [
