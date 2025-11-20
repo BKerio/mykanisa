@@ -10,7 +10,9 @@ import {
   Building2,
   Church,
   ArrowRight,
-  Currency
+  Currency,
+  EuroIcon,
+  Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -34,11 +36,12 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { name: 'Registered Members', icon: LucideUserCircle2, path: '/dashboard/members' },
     { name: 'Congregations', icon: ChurchIcon, path: '/dashboard/congregations' },
-    { name: 'Contributions', icon: Currency, path: '/dashboard/contributions' },
+    { name: 'Contributions', icon: EuroIcon, path: '/dashboard/contributions' },
     { name: 'Church Groups', icon: Users, path: '/dashboard/groups' },
     { name: 'Regions', icon: MapPin, path: '/dashboard/regions' },
     { name: 'Presbyteries', icon: Building2, path: '/dashboard/presbyteries' },
     { name: 'Parishes', icon: Church, path: '/dashboard/parishes' },
+    { name: 'System Configurations', icon: Settings, path: '/dashboard/parishes' },
   ];
 
   const handleLogout = async () => {

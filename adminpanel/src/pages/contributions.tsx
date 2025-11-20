@@ -305,7 +305,7 @@ const ContributionsPage = () => {
           <table className="w-full text-left">
             <thead className="bg-slate-50/80 border-b border-slate-200">
               <tr>
-                {['Date', 'Member Details', 'Account Type(s)', 'Amount', 'Status', 'M-PesaReceipt Ref'].map((h, i) => (
+                {['Date', 'Member Details', 'Account Type(s)', 'Amount', 'Status', 'M-Pesa Receipt Ref'].map((h, i) => (
                   <th key={i} className={`px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider ${h === 'Amount' || h === 'M-PesaReceipt Ref' ? 'text-right' : ''} ${h === 'Status' ? 'text-center' : ''}`}>
                     {h}
                   </th>
