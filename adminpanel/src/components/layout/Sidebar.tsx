@@ -40,7 +40,7 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
     { name: 'Regions', icon: MapPin, path: '/dashboard/regions' },
     { name: 'Presbyteries', icon: Building2, path: '/dashboard/presbyteries' },
     { name: 'Parishes', icon: Church, path: '/dashboard/parishes' },
-    { name: 'System Configurations', icon: Settings, path: '/dashboard/parishes' },
+    { name: 'System Configurations', icon: Settings, path: '/dashboard/system-config' },
   ];
 
   const handleLogout = async () => {

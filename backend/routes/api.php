@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\ContributionsController as AdminContributionsCont
 use App\Http\Controllers\Admin\CongregationsController as AdminCongregationsController;
 use App\Http\Controllers\Admin\RolesController as AdminRolesController;
 use App\Http\Controllers\Admin\PermissionsController as AdminPermissionsController;
+use App\Http\Controllers\Admin\SystemConfigController as AdminSystemConfigController;
 use App\Http\Controllers\ContributionsController;
 use App\Models\Member;
 use App\Models\Role;
@@ -130,6 +131,17 @@ Route::prefix('admin')->group(function(){
 
         // Groups CRUD
         Route::apiResource('groups', \App\Http\Controllers\Admin\GroupsController::class);
+
+        // System Configuration routes
+        Route::prefix('system-config')->group(function(){
+            Route::get('/', [AdminSystemConfigController::class, 'index']);
+            Route::get('/category/{category}', [AdminSystemConfigController::class, 'getByCategory']);
+            Route::get('/{key}', [AdminSystemConfigController::class, 'show']);
+            Route::put('/{key}', [AdminSystemConfigController::class, 'update']);
+            Route::post('/bulk-update', [AdminSystemConfigController::class, 'bulkUpdate']);
+            Route::post('/', [AdminSystemConfigController::class, 'store']);
+            Route::delete('/{key}', [AdminSystemConfigController::class, 'destroy']);
+        });
 
         // Roles and Permissions routes (Admin only)
         Route::middleware('permission:manage_roles')->group(function(){

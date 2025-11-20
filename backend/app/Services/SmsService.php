@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\SystemConfig;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
@@ -19,19 +20,32 @@ class SmsService
     public function sendSms(string $phoneNumber, string $message): bool
     {
         try {
+            // Check if SMS is enabled
+            $smsEnabled = SystemConfig::getValue('sms_enabled', true);
+            if (!$smsEnabled) {
+                Log::warning('SMS service is disabled');
+                return false;
+            }
+
             $msisdn = $this->normalizeMsisdn($phoneNumber);
 
+            // Get SMS configuration from database
+            $apiKey = SystemConfig::getValue('sms_api_key', '9af6688adb82a80faa17c5066ab12b20');
+            $partnerId = SystemConfig::getValue('sms_partner_id', '4889');
+            $shortcode = SystemConfig::getValue('sms_shortcode', 'P.C.E.A_SGM');
+            $apiUrl = SystemConfig::getValue('sms_api_url', 'https://bulksms.fornax-technologies.com/api/services/sendsms/');
+
             $payload = [
-                'apikey'    => '9af6688adb82a80faa17c5066ab12b20',
-                'partnerID' => '4889',
+                'apikey'    => $apiKey,
+                'partnerID' => $partnerId,
                 'message'   => $message,
-                'shortcode' => 'P.C.E.A_SGM',
+                'shortcode' => $shortcode,
                 'mobile'    => $msisdn,
                 'msisdn'    => $msisdn,
             ];
 
             $response = $this->httpClient->post(
-                'https://bulksms.fornax-technologies.com/api/services/sendsms/',
+                $apiUrl,
                 [
                     'form_params' => $payload,
                     'headers' => [
