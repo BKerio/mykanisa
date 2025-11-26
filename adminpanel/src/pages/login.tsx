@@ -1,9 +1,9 @@
 // src/components/Login.tsx
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
-import {  Eye,  EyeOff,  ArrowLeft,  Mail,  Lock } from 'lucide-react';
+import {  Eye,  EyeOff, Mail, Lock } from 'lucide-react';
 
 import Admin_Avator from "@/assets/icon.png";
 
@@ -64,14 +64,7 @@ function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 px-4">
       <div className="relative bg-white/70 backdrop-blur-lg shadow-2xl rounded-xl w-full max-w-md p-8">
-        {/* Go back */}
-        <button
-          onClick={() => navigate(-1)}
-          className="absolute top-4 left-4 text-gray-600 p-1 rounded-full hover:bg-gray-200"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+        
 
         {/* Admin Avatar */}
         <div className="flex flex-col items-center mb-6 mt-2">
@@ -135,19 +128,11 @@ function Login() {
           {/* Submit */}
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-3 rounded-md font-bold transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="w-full bg-slate-900 text-white py-3 rounded-md font-bold transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
-            Login as Admin
+            Login as admin
           </button>
         </form>
-
-        {/* Optional footer */}
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Not an admin?{' '}
-          <Link to="/" className="text-indigo-600 hover:underline font-medium">
-            Go back to Home
-          </Link>
-        </p>
       </div>
     </div>
   );

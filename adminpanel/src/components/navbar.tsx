@@ -291,7 +291,7 @@ const Navbar = ({ user, onToggleSidebar, showSidebarToggle = false, sidebarOpen 
                   </motion.div>
                 )}
 
-                {/* Mobile Menu Links */}
+                {/* Mobile Menu Links
                 <motion.div variants={itemVariants} className="space-y-1">
                   <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Menu</p>
                   {['Dashboard', 'Notifications', 'Analytics', 'Users'].map((item) => (
@@ -305,7 +305,7 @@ const Navbar = ({ user, onToggleSidebar, showSidebarToggle = false, sidebarOpen 
                       <div className="w-1 h-1 bg-slate-300 rounded-full" />
                     </Link>
                   ))}
-                </motion.div>
+                </motion.div> */}
               </div>
             </motion.div>
           </>

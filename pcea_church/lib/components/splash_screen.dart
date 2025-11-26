@@ -1,7 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:pcea_church/components/constant.dart';
 import 'package:pcea_church/components/welcome.dart';
+import 'package:pcea_church/config/server.dart';
+import 'package:pcea_church/method/api.dart';
+import 'package:pcea_church/screen/dashboard.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -15,11 +20,13 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _lottieController;
   bool copAnimated = false;
   bool animateCafeText = false;
+  bool _checkingSession = true;
 
   @override
   void initState() {
     super.initState();
     _lottieController = AnimationController(vsync: this);
+    _determineStartupDestination();
 
     // Fixed splash timing (always ~2s, regardless of Lottie length)
     Future.delayed(const Duration(seconds: 2), () {
@@ -30,6 +37,52 @@ class _SplashScreenState extends State<SplashScreen>
         setState(() {});
       });
     });
+  }
+
+  Future<void> _determineStartupDestination() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null || token.isEmpty) {
+      setState(() => _checkingSession = false);
+      return;
+    }
+
+    try {
+      final response = await API().getRequest(
+        url: Uri.parse('${Config.baseUrl}/members/me'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 200) {
+          final member = data['member'] ?? {};
+          if (member['name'] != null) {
+            prefs.setString('name', member['name']);
+          }
+          if (member['email'] != null) {
+            prefs.setString('email', member['email']);
+          }
+          if (member['congregation'] != null) {
+            prefs.setString('congregation_name', member['congregation']);
+          }
+          if (member['role'] != null) {
+            prefs.setString('role', member['role']);
+          }
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const Home()),
+          );
+          return;
+        }
+      }
+    } catch (_) {
+      // Ignore and fall back to login flow
+    }
+
+    await prefs.remove('token');
+    setState(() => _checkingSession = false);
   }
 
   @override
@@ -127,7 +180,10 @@ class _SplashScreenState extends State<SplashScreen>
           ),
 
           // Bottom text & navigation
-          Visibility(visible: copAnimated, child: const _BottomPart()),
+          Visibility(
+            visible: copAnimated && !_checkingSession,
+            child: const _BottomPart(),
+          ),
         ],
       ),
     );

@@ -5,7 +5,6 @@ import 'package:pcea_church/components/settings.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 import 'package:pcea_church/screen/add_dependents.dart';
-import 'package:pcea_church/screen/login.dart';
 import 'package:pcea_church/screen/member_messages.dart';
 import 'package:pcea_church/screen/payments.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -43,17 +42,23 @@ class BaseDashboardState extends State<BaseDashboard> {
   String? profileImageUrl;
 
   Timer? _timer;
+  Timer? _notificationTimer;
+  int _unreadMessages = 0;
+  int _paymentNotifications = 0;
+  bool _notificationStatsReady = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _startClock();
+    _startNotificationPolling();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _notificationTimer?.cancel();
     super.dispose();
   }
 
@@ -285,6 +290,98 @@ class BaseDashboardState extends State<BaseDashboard> {
     });
   }
 
+  void _startNotificationPolling() {
+    _notificationTimer?.cancel();
+    _fetchNotificationCounts();
+    _notificationTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _fetchNotificationCounts(),
+    );
+  }
+
+  Future<void> _fetchNotificationCounts() async {
+    try {
+      final futures = await Future.wait([
+        API().getRequest(
+          url: Uri.parse('${Config.baseUrl}/member/notifications'),
+        ),
+        API().getRequest(
+          url: Uri.parse('${Config.baseUrl}/contributions/summary'),
+        ),
+      ]);
+
+      int unreadMessages = _unreadMessages;
+      int paymentCount = _paymentNotifications;
+
+      final messageResponse = futures[0];
+      if (messageResponse.statusCode == 200) {
+        final body = jsonDecode(messageResponse.body);
+        if (body is Map<String, dynamic>) {
+          final directCount = body['unread_count'];
+          if (directCount is int) {
+            unreadMessages = directCount;
+          } else if (body['notifications'] is Map &&
+              (body['notifications']['unread_count']) is int) {
+            unreadMessages = body['notifications']['unread_count'] as int;
+          }
+        }
+      }
+
+      final paymentResponse = futures[1];
+      if (paymentResponse.statusCode == 200) {
+        final body = jsonDecode(paymentResponse.body);
+        if (body is Map<String, dynamic>) {
+          paymentCount = _derivePaymentCount(body['summary'], body);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _unreadMessages = unreadMessages;
+        _paymentNotifications = paymentCount;
+        _notificationStatsReady = true;
+      });
+    } catch (e) {
+      // Swallow errors to avoid interrupting dashboard flow
+    }
+  }
+
+  int _derivePaymentCount(dynamic summary, Map<String, dynamic> payload) {
+    if (summary is List) {
+      int total = 0;
+      for (final item in summary) {
+        if (item is Map<String, dynamic>) {
+          if (item['transactions_count'] is int) {
+            total += item['transactions_count'] as int;
+          } else if (item['count'] is int) {
+            total += item['count'] as int;
+          } else if (item['total_transactions'] is int) {
+            total += item['total_transactions'] as int;
+          } else {
+            total += 1;
+          }
+        } else {
+          total += 1;
+        }
+      }
+      return total;
+    }
+
+    final fallbackFields = [
+      'total_transactions',
+      'total_contributions',
+      'total',
+    ];
+
+    for (final field in fallbackFields) {
+      final value = payload[field];
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+    }
+
+    return 0;
+  }
+
   String getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good Morning';
@@ -300,108 +397,6 @@ class BaseDashboardState extends State<BaseDashboard> {
     final ekanisa = getEkanisaNumber();
     if (ekanisa.length <= 4) return ekanisa;
     return '${ekanisa.substring(0, 2)}${'*' * (ekanisa.length - 4)}${ekanisa.substring(ekanisa.length - 2)}';
-  }
-
-  void _logout() {
-    preferences?.clear();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const Login()),
-    );
-  }
-
-  void _confirmLogout() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: Colors.white,
-        elevation: 10,
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.logout_rounded,
-                color: Colors.orange,
-                size: 26,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Logout of the app',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Colors.black87,
-              ),
-            ),
-          ],
-        ),
-
-        content: Text(
-          '$username, are you sure you want to log out?',
-          style: const TextStyle(
-            fontSize: 16,
-            color: Colors.black54,
-            height: 1.4,
-          ),
-        ),
-
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[700],
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(
-              Icons.check_circle_outline,
-              size: 18,
-              color: Colors.white,
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orangeAccent,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              elevation: 4,
-            ),
-            onPressed: () {
-              Navigator.pop(ctx, true);
-              _logout();
-            },
-            label: const Text(
-              'Logout',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<bool> _onWillPop() async {
@@ -537,6 +532,189 @@ class BaseDashboardState extends State<BaseDashboard> {
     );
   }
 
+  void _showNotificationCenter() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: widget.getPrimaryColor().withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.notifications_active,
+                    color: Color(0xFF0A1F44),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Live activity',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        _notificationStatsReady
+                            ? 'Messages: $_unreadMessages • Payments: $_paymentNotifications'
+                            : 'Syncing latest activity...',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildNotificationStatTile(
+              title: 'Messages',
+              count: _unreadMessages,
+              icon: Icons.mark_email_unread,
+              color: Colors.deepPurpleAccent,
+              description: 'Unread updates from leadership',
+              onTap: () async {
+                Navigator.pop(ctx);
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MemberMessagesScreen(),
+                  ),
+                );
+                _fetchNotificationCounts();
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildNotificationStatTile(
+              title: 'Payments',
+              count: _paymentNotifications,
+              icon: Icons.wallet_rounded,
+              color: Colors.teal,
+              description: 'Recorded contributions',
+              onTap: () async {
+                Navigator.pop(ctx);
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PaymentsPage()),
+                );
+                _fetchNotificationCounts();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationStatTile({
+    required String title,
+    required int count,
+    required IconData icon,
+    required Color color,
+    required String description,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: color.withOpacity(0.3)),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopBar() {
     return SafeArea(
       child: Padding(
@@ -586,29 +764,112 @@ class BaseDashboardState extends State<BaseDashboard> {
                 ],
               ),
             ),
-            IconButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
-              ),
-              icon: const Icon(
-                Icons.notifications,
-                color: Colors.redAccent,
-                size: 36,
-              ),
-            ),
-
-            IconButton(
-              icon: const Icon(
-                Icons.logout_outlined,
-                color: Colors.black54,
-                size: 36,
-              ),
-              onPressed: _confirmLogout,
-            ),
+            _buildNotificationBell(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildNotificationBell() {
+    final total = _unreadMessages + _paymentNotifications;
+    final bool isInteractive = _notificationStatsReady;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(40),
+            onTap: isInteractive ? _showNotificationCenter : null,
+            child: SizedBox(
+              width: 64,
+              height: 64,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: Icon(
+                      Icons.notifications_active_outlined,
+                      color: isInteractive
+                          ? const Color(0xFF0A1F44)
+                          : Colors.black26,
+                      size: 44,
+                    ),
+                  ),
+                  if (isInteractive && total > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        child: Text(
+                          '$total',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (!isInteractive)
+                    const Positioned(
+                      right: 6,
+                      top: 6,
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF0A1F44),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: _notificationStatsReady && total > 0
+              ? Container(
+                  key: const ValueKey('notification-chip'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A1F44),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    'M $_unreadMessages · P $_paymentNotifications',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              : const SizedBox(
+                  key: ValueKey('notification-chip-empty'),
+                  height: 0,
+                ),
+        ),
+      ],
     );
   }
 

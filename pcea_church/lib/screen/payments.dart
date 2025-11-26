@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lottie/lottie.dart';
 
 class PaymentsPage extends StatefulWidget {
   const PaymentsPage({super.key});
@@ -37,6 +38,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
   String? _lastMessage;
   Color _lastMessageColor = Colors.green;
   String? _lastCheckoutId;
+  double? _submittedAmount; // Store the amount that was submitted
   List<Map<String, dynamic>> _activePledges = [];
   bool _phoneLoaded = false;
 
@@ -89,11 +91,14 @@ class _PaymentsPageState extends State<PaymentsPage> {
       final phoneInput = _phoneCtl.text.trim();
       final formattedPhone = _formatPhoneForMpesa(phoneInput);
 
+      // Store the submitted amount before making the request
+      final submittedAmount = _totalAmount;
+      
       final resp = await API().postRequest(
         url: Uri.parse('${Config.baseUrl}/mpesa/stkpush'),
         data: {
           'phone': formattedPhone,
-          'amount': _totalAmount,
+          'amount': submittedAmount,
           'reference': accountRef,
           'breakdown': breakdown,
         },
@@ -108,7 +113,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
       setState(() {
         _lastMessage = msg;
-        _lastMessageColor = Colors.teal;
+        _lastMessageColor = Colors.green;
+        _submittedAmount = submittedAmount; // Store the amount
       });
 
       if (_lastCheckoutId != null && _lastCheckoutId!.isNotEmpty) {
@@ -141,18 +147,37 @@ class _PaymentsPageState extends State<PaymentsPage> {
           final msg = (data['message'] ?? data['result_desc'] ?? '').toString();
 
           if (state == 'success') {
-            setState(() {
-              _lastMessage = msg.isNotEmpty ? msg : 'Contribution successful!';
-              _lastMessageColor = Colors.green.shade700;
-            });
+            final message = msg.isNotEmpty ? msg : 'Contribution successful!';
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            );
+
             _loadActivePledges();
+            _showSuccessAnimation(_submittedAmount ?? 0.0);
             return;
           }
+
           if (state == 'failed') {
+            final errorMessage = msg.isNotEmpty ? msg : 'Payment failed.';
             setState(() {
-              _lastMessage = msg.isNotEmpty ? msg : 'Payment failed.';
+              _lastMessage = errorMessage;
               _lastMessageColor = Colors.red.shade700;
             });
+            _showFailureAnimation(errorMessage);
             return;
           }
 
@@ -345,6 +370,177 @@ class _PaymentsPageState extends State<PaymentsPage> {
     return cleaned;
   }
 
+  void _showSuccessAnimation(double amount) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Lottie Animation
+                SizedBox(
+                  width: 300,
+                  height: 400,
+                  child: Lottie.asset(
+                    'assets/succesful_contribution.json',
+                    fit: BoxFit.contain,
+                    repeat: false,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Success Message
+                Text(
+                  'Contribution Successful!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0A1F44),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 15),
+                // Contributed Amount
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.green.shade200,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.account_balance_wallet,
+                        color: Colors.green.shade700,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'KES ${amount.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+                // Close Button
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0A1F44),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFailureAnimation(String errorMessage) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Lottie Animation
+                SizedBox(
+                  width: 300,
+                  height: 400,
+                  child: Lottie.asset(
+                    'assets/failed_contribution.json',
+                    fit: BoxFit.contain,
+                    repeat: false,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Error Message from result_desc
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Text(
+                    errorMessage,
+                    style: TextStyle(fontSize: 24, color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                // Close Button
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF0A1F44),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showPayPledgesDialog() {
     if (_activePledges.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -389,6 +585,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
       }
     }
 
+    // Track if dialog is open to prevent state updates after closing
+    bool isDialogOpen = true;
+
     // Show dialog with editable amounts
     showDialog(
       context: context,
@@ -423,10 +622,10 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       style: TextStyle(fontSize: 14),
                     ),
                     const SizedBox(height: 16),
-                    ...pledgeAmounts.entries.map((entry) {
+                    ...dialogAmountCtrls.entries.map((entry) {
                       final accountType = entry.key;
-                      final maxAmount = maxAmounts[accountType]!;
-                      final ctrl = dialogAmountCtrls[accountType]!;
+                      final maxAmount = maxAmounts[accountType] ?? 0.0;
+                      final ctrl = entry.value;
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
@@ -468,7 +667,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
                                 hintText: '0.00',
                               ),
                               onChanged: (_) {
-                                setDialogState(() {});
+                                if (isDialogOpen && mounted) {
+                                  setDialogState(() {});
+                                }
                               },
                               validator: (value) {
                                 final amount =
@@ -524,25 +725,53 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    // Validate amounts
+                    // Validate amounts - iterate over dialogAmountCtrls to avoid null errors
                     bool isValid = true;
-                    for (var entry in pledgeAmounts.entries) {
+                    String? errorMessage;
+                    for (var entry in dialogAmountCtrls.entries) {
                       final accountType = entry.key;
-                      final ctrl = dialogAmountCtrls[accountType]!;
-                      final amount = double.tryParse(ctrl.text.trim()) ?? 0;
-                      final maxAmount = maxAmounts[accountType]!;
+                      final ctrl = entry.value;
+                      final textValue = ctrl.text.trim();
 
-                      if (amount < 0 || amount > maxAmount) {
+                      // Check if text is empty or invalid
+                      if (textValue.isEmpty) {
                         isValid = false;
+                        errorMessage =
+                            'Please enter an amount for $accountType';
+                        break;
+                      }
+
+                      final amount = double.tryParse(textValue);
+                      if (amount == null) {
+                        isValid = false;
+                        errorMessage =
+                            'Please enter a valid number for $accountType';
+                        break;
+                      }
+
+                      final maxAmount = maxAmounts[accountType] ?? 0.0;
+
+                      if (amount < 0) {
+                        isValid = false;
+                        errorMessage =
+                            'Amount cannot be negative for $accountType';
+                        break;
+                      }
+
+                      if (amount > maxAmount) {
+                        isValid = false;
+                        errorMessage =
+                            'Amount for $accountType cannot exceed KES ${maxAmount.toStringAsFixed(2)}';
                         break;
                       }
                     }
 
                     if (!isValid) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
+                        SnackBar(
                           content: Text(
-                            'Please enter valid amounts within the pledge limits.',
+                            errorMessage ??
+                                'Please enter valid amounts within the pledge limits.',
                           ),
                           backgroundColor: Colors.red,
                         ),
@@ -550,31 +779,52 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       return;
                     }
 
-                    // Update the main form controllers with dialog values
+                    // Mark dialog as closing to prevent further state updates
+                    isDialogOpen = false;
+
+                    // Update the main form controllers with dialog values BEFORE closing
+                    final Map<String, String> valuesToApply = {};
                     for (var entry in dialogAmountCtrls.entries) {
                       final accountType = entry.key;
-                      final amount =
-                          double.tryParse(entry.value.text.trim()) ?? 0;
-                      if (_accountTypes.contains(accountType)) {
-                        _amountCtrls[accountType]!.text = amount
-                            .toStringAsFixed(2);
+                      final textValue = entry.value.text.trim();
+                      final amount = double.tryParse(textValue) ?? 0;
+
+                      // Only update if account type exists in _accountTypes and controller exists
+                      if (_accountTypes.contains(accountType) &&
+                          _amountCtrls.containsKey(accountType)) {
+                        valuesToApply[accountType] = amount.toStringAsFixed(2);
                       }
                     }
 
+                    // Close dialog first
                     Navigator.pop(context);
-                    setState(() {});
 
-                    // Show success message
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Pledge amounts loaded. Review and proceed to payment.',
-                          ),
-                          backgroundColor: Colors.blue,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                    // Update state after dialog is fully closed using a post-frame callback
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        // Apply the values after the frame
+                        for (var entry in valuesToApply.entries) {
+                          if (_amountCtrls.containsKey(entry.key)) {
+                            _amountCtrls[entry.key]!.text = entry.value;
+                          }
+                        }
+                        setState(() {});
+
+                        // Show success message
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Pledge amounts loaded. Review and proceed to payment.',
+                                ),
+                                backgroundColor: Colors.blue,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        });
+                      }
                     });
                   },
                   style: ElevatedButton.styleFrom(
@@ -589,14 +839,23 @@ class _PaymentsPageState extends State<PaymentsPage> {
         );
       },
     ).then((_) {
-      // Clean up controllers when dialog is closed (regardless of how it's closed)
-      for (var ctrl in dialogAmountCtrls.values) {
-        try {
-          ctrl.dispose();
-        } catch (_) {
-          // Controller already disposed or error, ignore
-        }
-      }
+      // Mark dialog as closed
+      isDialogOpen = false;
+
+      // Clean up controllers when dialog is closed
+      // Use a post-frame callback to ensure all widgets are done rebuilding
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Add a small delay to ensure dialog is fully dismissed
+        Future.delayed(const Duration(milliseconds: 300), () {
+          for (var ctrl in dialogAmountCtrls.values) {
+            try {
+              ctrl.dispose();
+            } catch (_) {
+              // Controller already disposed or error, ignore
+            }
+          }
+        });
+      });
     });
   }
 

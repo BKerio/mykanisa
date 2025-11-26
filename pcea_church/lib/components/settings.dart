@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:pcea_church/screen/digital_card.dart';
+import 'package:pcea_church/screen/login.dart';
 import 'package:pcea_church/screen/profile.dart';
 import 'package:pcea_church/screen/view_dependents.dart';
 import 'package:pcea_church/theme/theme_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -13,6 +15,104 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool darkMode = false;
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const Login()),
+      (route) => false,
+    );
+  }
+
+  void _confirmLogout() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        elevation: 10,
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Colors.black,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Logout of the app',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to log out?',
+          style: TextStyle(fontSize: 16, color: Colors.black54, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[700],
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(
+              Icons.check_circle_outline,
+              size: 18,
+              color: Colors.white,
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orangeAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 4,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx, true);
+              _logout();
+            },
+            label: const Text(
+              'Logout',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +180,17 @@ class _SettingsPageState extends State<SettingsPage> {
                   MaterialPageRoute(builder: (_) => const DigitalCardScreen()),
                 );
               },
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.logout, color: Color(0xFF0A1F44)),
+              title: const Text('Logout'),
+              subtitle: const Text('Sign out of this device'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: _confirmLogout,
             ),
           ),
           const SizedBox(height: 16),

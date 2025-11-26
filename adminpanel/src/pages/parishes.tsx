@@ -404,22 +404,28 @@ const ParishesPage = () => {
                       {/* Actions Column */}
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
+                      
+                          {/* Edit Button - Green */}
+                          <button
                             onClick={() => openEdit(parish)}
-                            className="p-2 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 transition-all shadow-sm"
+                            className="p-2 rounded-lg border border-transparent text-green-600 bg-green-50 hover:bg-green-100 hover:border-green-200 transition-all shadow-sm"
                             title="Edit"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          <button 
+                      
+                          {/* Delete Button - Red */}
+                          <button
                             onClick={() => deleteParish(parish)}
-                            className="p-2 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-lg text-slate-500 hover:text-red-600 transition-all shadow-sm"
+                            className="p-2 rounded-lg border border-transparent text-red-600 bg-red-50 hover:bg-red-100 hover:border-red-200 transition-all shadow-sm"
                             title="Delete"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                      
                         </div>
                       </td>
+
                     </motion.tr>
                   ))}
                 </AnimatePresence>

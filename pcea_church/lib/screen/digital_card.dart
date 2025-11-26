@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+// PACKAGES
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:gal/gal.dart';
+// THIS IMPORT IS REQUIRED FOR BARCODES
+import 'package:barcode_widget/barcode_widget.dart';
+
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 
@@ -19,6 +23,10 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
   bool isLoading = true;
   String? errorMessage;
   final GlobalKey _cardKey = GlobalKey();
+
+  // PCEA Brand Colors
+  final Color _pceaBlue = const Color(0xFF003366);
+  final Color _pceaGold = const Color(0xFFD4AF37);
 
   @override
   void initState() {
@@ -59,21 +67,21 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
     }
   }
 
+  // 1. DATA GENERATION FOR BARCODE
+  // We strip this down to the unique ID so the barcode remains short and scannable.
+  String _generateBarcodeData() {
+    if (memberData == null) return '000000';
+    return memberData!['e_kanisa_number'] ?? '000000';
+  }
+
+  // 2. DATA GENERATION FOR QR (Hidden fallback if needed)
   String _generateQRData() {
     if (memberData == null) return '';
-
     final qrData = {
-      'type': 'PCEA_MEMBER',
-      'member_id': memberData!['id'],
-      'e_kanisa_number': memberData!['e_kanisa_number'],
-      'full_name': memberData!['full_name'],
-      'congregation': memberData!['congregation'],
-      'parish': memberData!['parish'],
-      'presbytery': memberData!['presbytery'],
-      'region': memberData!['region'],
-      'generated_at': DateTime.now().toIso8601String(),
+      'type': 'PCEA',
+      'id': memberData!['id'],
+      'kanisa': memberData!['e_kanisa_number'],
     };
-
     return jsonEncode(qrData);
   }
 
@@ -83,13 +91,14 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
       if (!hasAccess) {
         bool granted = await Gal.requestAccess();
         if (!granted) {
-          _showMessage('Gallery access permission required to save card');
+          _showMessage('Gallery access permission required');
           return;
         }
       }
 
       final RenderRepaintBoundary boundary =
           _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ImageByteFormat.png);
       final pngBytes = byteData!.buffer.asUint8List();
@@ -97,7 +106,7 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
       await Gal.putImageBytes(
         pngBytes,
         album: "PCEA Church",
-        name: "PCEA_Member_Card_${memberData!['e_kanisa_number']}",
+        name: "PCEA_Member_${memberData!['e_kanisa_number']}",
       );
 
       _showMessage('Card saved to gallery successfully!', isSuccess: true);
@@ -110,71 +119,78 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isSuccess ? Colors.green : Colors.red,
+        backgroundColor: isSuccess
+            ? Colors.green.shade700
+            : Colors.red.shade700,
       ),
     );
   }
 
-  void _showLargeQR() {
+  // POPUP FOR LARGER VIEW
+  void _showLargeScannerView() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return Dialog(
           backgroundColor: Colors.transparent,
+          elevation: 0,
           child: Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Scan QR Code',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300, width: 2),
-                  ),
-                  child: QrImageView(
-                    data: _generateQRData(),
-                    version: QrVersions.auto,
-                    size: 250.0,
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    errorStateBuilder: (cxt, err) {
-                      return const Center(
-                        child: Text(
-                          'QR Code Error',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'E-Kanisa: ${memberData!['e_kanisa_number'] ?? 'N/A'}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  'Scanner View',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  memberData!['full_name'] ?? 'N/A',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  'Scan the barcode below',
+                  style: TextStyle(color: Colors.grey[600]),
                 ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
+                const SizedBox(height: 24),
+
+                // LARGE BARCODE DISPLAY
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 30,
+                    horizontal: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: BarcodeWidget(
+                    barcode: Barcode.code128(),
+                    data: _generateBarcodeData(),
+                    drawText: true,
+                    height: 100,
+                    width: double.infinity,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      letterSpacing: 4,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _pceaBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'),
+                  ),
                 ),
               ],
             ),
@@ -187,266 +203,255 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE8F4FD),
+      backgroundColor: const Color(0xFFF0F4F8),
       appBar: AppBar(
-        title: const Text('Digital Membership Card'),
-        backgroundColor: const Color(0xFF0A1F44),
+        title: const Text('Digital Membership'),
+        centerTitle: true,
+        backgroundColor: _pceaBlue,
         foregroundColor: Colors.white,
-        elevation: 0,
         actions: [
-          if (memberData != null) ...[
+          if (memberData != null)
             IconButton(
-              icon: const Icon(Icons.qr_code),
-              onPressed: _showLargeQR,
-              tooltip: 'View Large QR',
-            ),
-            IconButton(
-              icon: const Icon(Icons.share),
+              icon: const Icon(Icons.share_outlined),
               onPressed: _saveCardToGallery,
-              tooltip: 'Save Card',
             ),
-          ],
         ],
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: _pceaBlue))
           : errorMessage != null
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    errorMessage!,
-                    style: const TextStyle(fontSize: 16, color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
+                  const Icon(Icons.error_outline, size: 40, color: Colors.red),
+                  const SizedBox(height: 10),
+                  Text(errorMessage!),
                   ElevatedButton(
                     onPressed: _loadMemberData,
-                    child: const Text('Retry'),
+                    child: const Text("Retry"),
                   ),
                 ],
               ),
             )
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: RepaintBoundary(
-                  key: _cardKey,
-                  child: _buildDigitalCard(),
-                ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 30),
+                  Center(
+                    child: RepaintBoundary(
+                      key: _cardKey,
+                      child: _buildBarcodeCard(),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  Text(
+                    "Tap card to enlarge barcode",
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ],
               ),
             ),
     );
   }
 
-  Widget _buildDigitalCard() {
+  Widget _buildBarcodeCard() {
     final imageUrl = memberData?['profile_image_url'];
 
-    return Container(
-      width: 480,
-      height: 380,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1F44),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+    return GestureDetector(
+      onTap: _showLargeScannerView,
+      child: Container(
+        width: 360,
+        height: 540,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: _pceaBlue.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_pceaBlue, const Color(0xFF001F3F)],
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Background pattern
-          Positioned(
-            top: -50,
-            right: -50,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+        ),
+        child: Stack(
+          children: [
+            // Decorative Circle
+            Positioned(
+              top: -60,
+              right: -60,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.05),
+                    width: 30,
+                  ),
+                ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: -30,
-            left: -30,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.08),
-              ),
-            ),
-          ),
 
-          // Card content
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Column(
               children: [
-                // Header with circular profile
-                Row(
-                  children: [
-                    ClipOval(
-                      child: imageUrl != null && imageUrl.isNotEmpty
-                          ? Image.network(
-                              imageUrl,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Image.asset(
-                                    'assets/icon.png',
-                                    width: 60,
-                                    height: 60,
+                // 1. Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 20),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _pceaGold,
+                        ),
+                        child: ClipOval(
+                          child: imageUrl != null && imageUrl.isNotEmpty
+                              ? Image.network(
+                                  imageUrl,
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      Icon(Icons.person, color: _pceaBlue),
+                                )
+                              : Container(
+                                  width: 64,
+                                  height: 64,
+                                  color: Colors.white,
+                                  child: Icon(
+                                    Icons.person,
+                                    color: _pceaBlue,
+                                    size: 40,
                                   ),
-                            )
-                          : Image.asset(
-                              'assets/icon.png',
-                              width: 60,
-                              height: 60,
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'PCEA Church',
+                            'PCEA CHURCH',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
                             ),
                           ),
                           Text(
-                            'MEMBER CARD',
+                            'OFFICIAL MEMBER',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
+                              color: _pceaGold,
                               fontSize: 12,
-                              letterSpacing: 2,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 2.0,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
 
-                const SizedBox(height: 16),
+                const Divider(color: Colors.white24, thickness: 1),
 
-                // Main content
-                Expanded(
-                  child: Row(
+                // 2. Info Section
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Member details
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              memberData!['full_name'] ?? 'N/A',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Kanisa Number: ${memberData!['e_kanisa_number'] ?? 'N/A'}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'My Congregation: ${memberData!['congregation'] ?? 'N/A'}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                      Text(
+                        "NAME",
+                        style: TextStyle(color: Colors.white54, fontSize: 10),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        memberData!['full_name']?.toUpperCase() ?? 'N/A',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Courier',
                         ),
                       ),
-
-                      const SizedBox(width: 16),
-
-                      // QR Code
-                      Container(
-                        width: 220,
-                        height: 220,
-                        decoration: BoxDecoration(
+                      const SizedBox(height: 16),
+                      Text(
+                        "CONGREGATION",
+                        style: TextStyle(color: Colors.white54, fontSize: 10),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        memberData!['congregation'] ?? 'N/A',
+                        style: const TextStyle(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.black26, width: 2),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: QrImageView(
-                            data: _generateQRData(),
-                            version: QrVersions.auto,
-                            size: 136,
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                            errorStateBuilder: (cxt, err) {
-                              return const Center(
-                                child: Text(
-                                  'QR Error',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              );
-                            },
-                          ),
+                          fontSize: 16,
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const Spacer(),
 
-                // Footer
-                Row(
-                  children: [
-                    const Spacer(),
-                    Text(
-                      'Valid Member',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 1,
+                // 3. BARCODE FOOTER (THE FIX)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      // --- BARCODE WIDGET ---
+                      // Code 128 is the standard "short" barcode
+                      BarcodeWidget(
+                        barcode: Barcode.code128(),
+                        data: _generateBarcodeData(),
+                        drawText:
+                            false, // We draw customized text below instead
+                        color: Colors.black,
+                        width: double.infinity,
+                        height: 60, // Fixed height for clean look
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.check_circle,
-                      color: Colors.green,
-                      size: 14,
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      // The Readable Text
+                      Text(
+                        memberData!['e_kanisa_number'] ?? '',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "MEMBER ID",
+                        style: TextStyle(
+                          color: _pceaBlue.withOpacity(0.5),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

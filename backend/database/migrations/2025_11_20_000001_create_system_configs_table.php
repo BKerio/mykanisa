@@ -101,4 +101,3 @@ return new class extends Migration
         Schema::dropIfExists('system_configs');
     }
 };
-

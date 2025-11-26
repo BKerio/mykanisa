@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider } from '@/components/theme-provider';
 import RequireAuth from '@/components/requireAuth';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import Welcome from '@/pages/Welcome';
 import Login from '@/pages/login';
 import Dashboard from '@/pages/Dashboard';
 import MembersPage from '@/pages/members';
@@ -24,7 +23,6 @@ function App() {
         <div className='min-h-screen bg-white dark:bg-gray-900'>
           <Routes>
             
-            <Route path="/welcome" element={<Welcome />} />
             <Route path="/login" element={<Login />} />
 
             <Route
@@ -46,8 +44,8 @@ function App() {
               <Route path="system-config" element={<SystemConfigPage />} />
             </Route>
 
-            <Route path="/" element={<Navigate to="/welcome" replace />} />
-            <Route path="*" element={<Navigate to="/welcome" replace />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
 
           </Routes>
          

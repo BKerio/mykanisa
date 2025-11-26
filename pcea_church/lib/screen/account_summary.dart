@@ -546,18 +546,20 @@ class _LedgerPageState extends State<LedgerPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Total Summary Card (moved above pledges)
+                            if (_payments.isNotEmpty) ...[
+                              _buildSummaryCard(grandTotal),
+                              const SizedBox(height: 24),
+                            ],
+
                             // Pledges Section (if any)
                             if (_pledges.isNotEmpty) ...[
                               _buildPledgesSection(),
                               const SizedBox(height: 24),
                             ],
 
-                            // Contributions Section
+                            // Contributions Section (table and legend)
                             if (_payments.isNotEmpty) ...[
-                              // Total Summary Card
-                              _buildSummaryCard(grandTotal),
-                              const SizedBox(height: 24),
-
                               // Table Section
                               Row(
                                 mainAxisAlignment:
@@ -648,10 +650,21 @@ class _LedgerPageState extends State<LedgerPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Total Contributions",
-            style: TextStyle(color: AppColors.textLight, fontSize: 14),
+          Row(
+            children: [
+              Icon(Icons.money, color: AppColors.primary, size: 24),
+              const SizedBox(width: 8),
+              const Text(
+                "Total Contribution made",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
           const SizedBox(height: 8),
           Text(
             "KES ${_formatMoney(total)}",
@@ -666,11 +679,11 @@ class _LedgerPageState extends State<LedgerPage> {
           const Divider(height: 24),
           Row(
             children: [
-              Icon(Icons.church_outlined, size: 16, color: Colors.grey[600]),
+              Icon(Icons.house_rounded, size: 16, color: Colors.black),
               const SizedBox(width: 8),
               Text(
                 _congregation.isNotEmpty ? _congregation : "Main Congregation",
-                style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                style: TextStyle(color: Colors.black, fontSize: 16),
               ),
             ],
           ),
@@ -854,12 +867,63 @@ class _LedgerPageState extends State<LedgerPage> {
   }
 
   Widget _buildPledgesSection() {
+    // Group pledges by account type to avoid duplicates
+    final Map<String, Map<String, dynamic>> groupedPledges = {};
+    
+    for (var pledge in _pledges) {
+      final accountType = pledge['account_type'] ?? 'Others';
+      
+      if (!groupedPledges.containsKey(accountType)) {
+        groupedPledges[accountType] = {
+          'account_type': accountType,
+          'pledge_amount': 0.0,
+          'fulfilled_amount': 0.0,
+          'remaining_amount': 0.0,
+          'status': 'active',
+          'count': 0,
+        };
+      }
+      
+      final group = groupedPledges[accountType]!;
+      group['pledge_amount'] = (group['pledge_amount'] as double) + 
+          _toDouble(pledge['pledge_amount']);
+      group['fulfilled_amount'] = (group['fulfilled_amount'] as double) + 
+          _toDouble(pledge['fulfilled_amount']);
+      group['remaining_amount'] = (group['remaining_amount'] as double) + 
+          _toDouble(pledge['remaining_amount']);
+      group['count'] = (group['count'] as int) + 1;
+      
+      // Determine status: if any is active, show active; if all fulfilled, show fulfilled
+      final pledgeStatus = pledge['status'] ?? 'active';
+      if (pledgeStatus == 'active' && group['status'] != 'active') {
+        group['status'] = 'active';
+      } else if (pledgeStatus == 'fulfilled' && group['status'] == 'active') {
+        // Keep active if there are any active pledges
+      } else if (pledgeStatus == 'cancelled') {
+        group['status'] = 'cancelled';
+      }
+    }
+    
+    // Sort by account type order
+    final accountTypeOrder = ['Tithe', 'Offering', 'Development', 'Thanksgiving', 'FirstFruit', 'Others'];
+    final sortedPledges = groupedPledges.values.toList()
+      ..sort((a, b) {
+        final aType = a['account_type'] as String;
+        final bType = b['account_type'] as String;
+        final aIndex = accountTypeOrder.indexOf(aType);
+        final bIndex = accountTypeOrder.indexOf(bType);
+        if (aIndex == -1 && bIndex == -1) return aType.compareTo(bType);
+        if (aIndex == -1) return 1;
+        if (bIndex == -1) return -1;
+        return aIndex.compareTo(bIndex);
+      });
+    
     // Calculate totals
     double totalPledged = 0;
     double totalFulfilled = 0;
     double totalRemaining = 0;
 
-    for (var pledge in _pledges) {
+    for (var pledge in sortedPledges) {
       totalPledged += _toDouble(pledge['pledge_amount']);
       totalFulfilled += _toDouble(pledge['fulfilled_amount']);
       totalRemaining += _toDouble(pledge['remaining_amount']);
@@ -868,23 +932,6 @@ class _LedgerPageState extends State<LedgerPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section Header
-        Row(
-          children: [
-            Icon(Icons.flag, color: AppColors.primary, size: 24),
-            const SizedBox(width: 8),
-            const Text(
-              "My Pledges",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textDark,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
         // Pledges Summary Card
         Container(
           width: double.infinity,
@@ -903,6 +950,21 @@ class _LedgerPageState extends State<LedgerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Icon(Icons.flag, color: AppColors.primary, size: 24),
+                  const SizedBox(width: 8),
+                  const Text(
+                    "My Pledges towards the church",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               const Text(
                 "Pledge Summary",
                 style: TextStyle(color: AppColors.textLight, fontSize: 14),
@@ -994,7 +1056,7 @@ class _LedgerPageState extends State<LedgerPage> {
                 ),
               ],
               rows: [
-                ..._pledges.asMap().entries.map((entry) {
+                ...sortedPledges.asMap().entries.map((entry) {
                   final idx = entry.key;
                   final pledge = entry.value;
                   final pledgeAmount = _toDouble(pledge['pledge_amount']);
@@ -1002,6 +1064,7 @@ class _LedgerPageState extends State<LedgerPage> {
                   final remainingAmount = _toDouble(pledge['remaining_amount']);
                   final status = pledge['status'] ?? 'active';
                   final accountType = pledge['account_type'] ?? '';
+                  final count = pledge['count'] as int;
 
                   return DataRow(
                     color: MaterialStateProperty.resolveWith<Color?>((
@@ -1011,9 +1074,34 @@ class _LedgerPageState extends State<LedgerPage> {
                     }),
                     cells: [
                       DataCell(
-                        Text(
-                          accountType,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        Row(
+                          children: [
+                            Text(
+                              accountType,
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            if (count > 1) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '$count',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       DataCell(
@@ -1172,16 +1260,29 @@ class _Payment {
     required this.contributionType,
   });
 
-  factory _Payment.fromContributionJson(Map<String, dynamic> j) => _Payment(
-    accountReference: (j['contribution_type'] ?? '').toString(),
-    amount: (j['total_amount'] is num)
-        ? (j['total_amount'] as num).toDouble()
-        : double.tryParse(j['total_amount'].toString()) ?? 0.0,
-    // NOTE: Ideally this should come from the API (e.g. j['created_at'])
-    // Kept as per original code to ensure compatibility with your specific API response
-    createdAt: DateTime.now(),
-    contributionType: (j['contribution_type'] ?? '').toString(),
-  );
+  factory _Payment.fromContributionJson(Map<String, dynamic> j) {
+    // FIX: Parse the date from the API response instead of using DateTime.now()
+    final dateString =
+        (j['created_at'] ?? j['transaction_date'] ?? j['date'] ?? '')
+            .toString();
+    DateTime date;
+
+    if (dateString.isNotEmpty) {
+      // Safely parse the date string. If parsing fails, fall back to today.
+      date = DateTime.tryParse(dateString) ?? DateTime.now();
+    } else {
+      date = DateTime.now();
+    }
+
+    return _Payment(
+      accountReference: (j['contribution_type'] ?? '').toString(),
+      amount: (j['total_amount'] is num)
+          ? (j['total_amount'] as num).toDouble()
+          : double.tryParse(j['total_amount'].toString()) ?? 0.0,
+      createdAt: date, // <--- FIXED to use the parsed date
+      contributionType: (j['contribution_type'] ?? '').toString(),
+    );
+  }
 }
 
 class _MonthKey implements Comparable<_MonthKey> {
