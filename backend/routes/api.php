@@ -262,8 +262,8 @@ Route::middleware(['auth:sanctum', 'role:pastor'])->group(function(){
     });
 });
 
-// Elder routes
-Route::middleware(['auth:sanctum', 'role:elder'])->group(function(){
+// Elder routes (also accessible to secretaries)
+Route::middleware(['auth:sanctum', 'role:elder|secretary'])->group(function(){
     Route::prefix('elder')->group(function(){
         Route::get('/me', [\App\Http\Controllers\Elder\AuthController::class, 'me']);
         Route::post('/logout', [\App\Http\Controllers\Elder\AuthController::class, 'logout']);
@@ -292,6 +292,13 @@ Route::middleware(['auth:sanctum', 'role:elder'])->group(function(){
         Route::post('/messages/{announcement}/reply', [\App\Http\Controllers\Elder\MessagesController::class, 'replyToMember']);
         Route::post('/messages/{announcement}/mark-read', [\App\Http\Controllers\Elder\MessagesController::class, 'markAsRead']);
         Route::get('/messages/unread-count', [\App\Http\Controllers\Elder\MessagesController::class, 'unreadCount']);
+        
+        // Events routes
+        Route::get('/events', [\App\Http\Controllers\Elder\EventsController::class, 'index']);
+        Route::post('/events', [\App\Http\Controllers\Elder\EventsController::class, 'store']);
+        Route::get('/events/{event}', [\App\Http\Controllers\Elder\EventsController::class, 'show']);
+        Route::put('/events/{event}', [\App\Http\Controllers\Elder\EventsController::class, 'update']);
+        Route::delete('/events/{event}', [\App\Http\Controllers\Elder\EventsController::class, 'destroy']);
     });
 });
 
@@ -451,7 +458,8 @@ Route::middleware(['auth:sanctum'])->group(function(){
         Route::delete('/notifications/{announcement}', [\App\Http\Controllers\Member\DashboardController::class, 'delete']);
         Route::post('/notifications/{announcement}/mark-read', [\App\Http\Controllers\Member\DashboardController::class, 'markAsRead']);
         Route::get('/notifications/unread-count', [\App\Http\Controllers\Member\DashboardController::class, 'unreadCount']);
-        Route::get('/events', [\App\Http\Controllers\Member\DashboardController::class, 'events']);
+        Route::get('/events', [\App\Http\Controllers\Member\EventsController::class, 'index']);
+        Route::get('/events/{event}', [\App\Http\Controllers\Member\EventsController::class, 'show']);
         // Messages to elders
         Route::get('/elders', [\App\Http\Controllers\Member\DashboardController::class, 'getElders']);
         Route::post('/send-message-to-elder', [\App\Http\Controllers\Member\DashboardController::class, 'sendMessageToElder']);

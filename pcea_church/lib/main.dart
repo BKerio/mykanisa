@@ -1,5 +1,7 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:pcea_church/components/splash_screen.dart';
+import 'package:pcea_church/screen/responsive_sample_page.dart';
 import 'package:pcea_church/theme/theme_controller.dart';
 
 void main() async {
@@ -38,6 +40,7 @@ class _MyAppState extends State<MyApp> {
       title: 'My Kanisa App',
       debugShowCheckedModeBanner: false,
       theme: themeController.getAdaptiveTheme(),
+      scrollBehavior: AppScrollBehavior(),
 
       builder: (context, child) {
         final scale = themeController.textScaleFactor;
@@ -49,6 +52,21 @@ class _MyAppState extends State<MyApp> {
       },
 
       home: const SplashScreen(),
+      routes: {
+        ResponsiveSamplePage.routeName: (context) =>
+            const ResponsiveSamplePage(),
+      },
     );
   }
+}
+
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.unknown,
+      };
 }

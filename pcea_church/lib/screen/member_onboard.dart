@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:pcea_church/components/responsive_layout.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 import 'package:pcea_church/screen/login.dart';
@@ -1847,177 +1848,184 @@ class _RegisterState extends State<Register> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFE8F4FD),
-      body: SafeArea(
+  Widget _buildOnboardingCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Form(
+        key: _formKey,
         child: Column(
           children: [
-            // Main Content Area
             Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(30),
-                    topRight: Radius.circular(30),
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    currentStep = index;
+                  });
+                },
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.only(
+                      left: 24,
+                      right: 24,
+                      top: 24,
+                      bottom: 40,
+                    ),
+                    child: _buildPersonalInfoStep(),
                   ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.only(
+                      left: 24,
+                      right: 24,
+                      top: 24,
+                      bottom: 40,
+                    ),
+                    child: _buildChurchDetailsStep(),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.only(
+                      left: 24,
+                      right: 24,
+                      top: 24,
+                      bottom: 40,
+                    ),
+                    child: _buildDependentsStep(),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.only(
+                      left: 24,
+                      right: 24,
+                      top: 24,
+                      bottom: 40,
+                    ),
+                    child: _buildSecurityStep(),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
                 ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 10,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Page View with scrollable content (swappable enabled)
-                      Expanded(
-                        child: PageView(
-                          controller: _pageController,
-                          // Swapping enabled here
-                          onPageChanged: (index) {
-                            setState(() {
-                              currentStep = index;
-                            });
-                          },
-                          children: [
-                            SingleChildScrollView(
-                              padding: const EdgeInsets.only(
-                                left: 24,
-                                right: 24,
-                                top: 24,
-                                bottom: 40,
-                              ),
-                              child: _buildPersonalInfoStep(),
-                            ),
-                            SingleChildScrollView(
-                              padding: const EdgeInsets.only(
-                                left: 24,
-                                right: 24,
-                                top: 24,
-                                bottom: 40,
-                              ),
-                              child: _buildChurchDetailsStep(),
-                            ),
-                            SingleChildScrollView(
-                              padding: const EdgeInsets.only(
-                                left: 24,
-                                right: 24,
-                                top: 24,
-                                bottom: 40,
-                              ),
-                              child: _buildDependentsStep(),
-                            ),
-                            SingleChildScrollView(
-                              padding: const EdgeInsets.only(
-                                left: 24,
-                                right: 24,
-                                top: 24,
-                                bottom: 40,
-                              ),
-                              child: _buildSecurityStep(),
-                            ),
-                          ],
-                        ),
+                      _CreativeArrowButton(
+                        label: 'Previous',
+                        icon: Icons.arrow_back_ios_new_rounded,
+                        isForward: false,
+                        onPressed: currentStep > 0 ? previousStep : null,
                       ),
-
-                      // Fixed bottom section with navigation controls
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                            topRight: Radius.circular(20),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 10,
-                              offset: Offset(0, -2),
+                      _buildStepIndicator(),
+                      currentStep == totalSteps - 1
+                          ? _CreativeArrowButton(
+                              label: isLoading ? 'Registering...' : 'Finish',
+                              icon: isLoading
+                                  ? Icons.hourglass_top
+                                  : Icons.check_circle_outline,
+                              isForward: true,
+                              onPressed: isLoading ? null : submit,
+                            )
+                          : _CreativeArrowButton(
+                              label: 'Next',
+                              icon: Icons.arrow_forward_ios_rounded,
+                              isForward: true,
+                              onPressed: nextStep,
                             ),
-                          ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "Already have an account? ",
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const Login()),
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Creative Navigation Bar
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // Previous Button
-                                _CreativeArrowButton(
-                                  label: 'Previous',
-                                  icon: Icons.arrow_back_ios_new_rounded,
-                                  isForward: false,
-                                  onPressed: currentStep > 0
-                                      ? previousStep
-                                      : null,
-                                ),
-
-                                // Step Indicator
-                                _buildStepIndicator(),
-
-                                // Next Button
-                                currentStep == totalSteps - 1
-                                    ? _CreativeArrowButton(
-                                        label: isLoading
-                                            ? 'Registering...'
-                                            : 'Finish',
-                                        icon: isLoading
-                                            ? Icons.hourglass_top
-                                            : Icons.check_circle_outline,
-                                        isForward: true,
-                                        onPressed: isLoading ? null : submit,
-                                      )
-                                    : _CreativeArrowButton(
-                                        label: 'Next',
-                                        icon: Icons.arrow_forward_ios_rounded,
-                                        isForward: true,
-                                        onPressed: nextStep,
-                                      ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Login Link
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  "Already have an account? ",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () => Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const Login(),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    "Login",
-                                    style: TextStyle(
-                                      color: primaryColor,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                        child: Text(
+                          "Login",
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileOnboarding() {
+    return SafeArea(
+      child: Column(children: [Expanded(child: _buildOnboardingCard())]),
+    );
+  }
+
+  Widget _buildDesktopOnboarding() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SafeArea(
+          child: Center(
+            child: SizedBox(
+              width: 520,
+              height: constraints.maxHeight,
+              child: _buildOnboardingCard(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFE8F4FD),
+      body: ResponsiveLayout(
+        mobile: _buildMobileOnboarding(),
+        desktop: DesktopScaffoldFrame(
+          backgroundColor: const Color(0xFFE8F4FD),
+          title: '',
+          primaryColor: const Color(0xFF35C2C1),
+          child: _buildDesktopOnboarding(),
         ),
       ),
     );

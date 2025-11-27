@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:pcea_church/components/constant.dart';
+import 'package:pcea_church/components/responsive_layout.dart';
 import 'package:pcea_church/components/welcome.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
@@ -28,7 +29,7 @@ class _SplashScreenState extends State<SplashScreen>
     _lottieController = AnimationController(vsync: this);
     _determineStartupDestination();
 
-    // Fixed splash timing (always ~2s, regardless of Lottie length)
+    // Fixed splash timing
     Future.delayed(const Duration(seconds: 2), () {
       copAnimated = true;
       setState(() {});
@@ -57,18 +58,13 @@ class _SplashScreenState extends State<SplashScreen>
         final data = jsonDecode(response.body);
         if (data['status'] == 200) {
           final member = data['member'] ?? {};
-          if (member['name'] != null) {
-            prefs.setString('name', member['name']);
-          }
-          if (member['email'] != null) {
+          if (member['name'] != null) prefs.setString('name', member['name']);
+          if (member['email'] != null)
             prefs.setString('email', member['email']);
-          }
           if (member['congregation'] != null) {
             prefs.setString('congregation_name', member['congregation']);
           }
-          if (member['role'] != null) {
-            prefs.setString('role', member['role']);
-          }
+          if (member['role'] != null) prefs.setString('role', member['role']);
           if (!mounted) return;
           Navigator.pushReplacement(
             context,
@@ -77,9 +73,7 @@ class _SplashScreenState extends State<SplashScreen>
           return;
         }
       }
-    } catch (_) {
-      // Ignore and fall back to login flow
-    }
+    } catch (_) {}
 
     await prefs.remove('token');
     setState(() => _checkingSession = false);
@@ -91,100 +85,121 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    var screenHeight = MediaQuery.of(context).size.height;
-    return Scaffold(
-      backgroundColor: Color(0xFF0A1F44),
-      body: Stack(
-        children: [
-          // Top animated container
-          AnimatedContainer(
-            duration: const Duration(seconds: 1),
-            height: copAnimated ? screenHeight / 1.9 : screenHeight,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(
-                bottom: Radius.circular(copAnimated ? 40.0 : 0.0),
-              ),
+  Widget _buildSplashStack(BuildContext context, {double? heightOverride}) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final containerHeight = heightOverride ?? screenHeight;
+
+    final isDesktop = screenWidth >= 900;
+
+    return Stack(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(seconds: 1),
+          height: copAnimated ? containerHeight / 1.9 : containerHeight,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(copAnimated ? 40.0 : 0.0),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Show Lottie before transition
-                Visibility(
-                  visible: !copAnimated,
-                  child: Lottie.asset(
-                    'assets/Church.json',
-                    controller: _lottieController,
-                    onLoaded: (composition) {
-                      // Speed up the animation (~1.5x faster)
-                      final fasterDuration = Duration(
-                        milliseconds:
-                            (composition.duration.inMilliseconds / 1.5).round(),
-                      );
-                      _lottieController
-                        ..duration = fasterDuration
-                        ..forward();
-                    },
-                  ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Visibility(
+                visible: !copAnimated,
+                child: Lottie.asset(
+                  'assets/Church.json',
+                  controller: _lottieController,
+                  height: isDesktop
+                      ? containerHeight * 0.6
+                      : containerHeight * 0.45,
+                  onLoaded: (composition) {
+                    final fasterDuration = Duration(
+                      milliseconds: (composition.duration.inMilliseconds / 1.5)
+                          .round(),
+                    );
+                    _lottieController
+                      ..duration = fasterDuration
+                      ..forward();
+                  },
                 ),
-                // Show logo after transition
-                Visibility(
-                  visible: copAnimated,
+              ),
+              Visibility(
+                visible: copAnimated,
+                child: Center(
                   child: Image.asset(
                     'assets/icon.png',
-                    height: 190.0,
-                    width: 190.0,
+                    height: isDesktop ? 220.0 : 190.0,
+                    width: isDesktop ? 220.0 : 190.0,
+                    fit: BoxFit.contain,
                   ),
                 ),
-                // Animated welcome text
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedOpacity(
-                        opacity: animateCafeText ? 1 : 0,
-                        duration: const Duration(seconds: 1),
-                        child: const Text(
-                          'Welcome To PCEA.',
-                          style: TextStyle(
-                            fontSize: 40.0,
-                            color: cafeBrown,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
+              ),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedOpacity(
+                      opacity: animateCafeText ? 1 : 0,
+                      duration: const Duration(seconds: 1),
+                      child: Text(
+                        'Welcome To PCEA.',
+                        style: TextStyle(
+                          fontSize: isDesktop ? 48.0 : 40.0,
+                          color: cafeBrown,
+                          fontWeight: FontWeight.bold,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 12),
-                      AnimatedOpacity(
-                        opacity: animateCafeText ? 1 : 0,
-                        duration: const Duration(seconds: 1),
-                        child: Text(
-                          'Faith  •  Love  •  Hope',
-                          style: TextStyle(
-                            fontSize: 24.0,
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 1.2,
-                          ),
-                          textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: isDesktop ? 16 : 12),
+                    AnimatedOpacity(
+                      opacity: animateCafeText ? 1 : 0,
+                      duration: const Duration(seconds: 1),
+                      child: Text(
+                        'Faith  •  Love  •  Hope',
+                        style: TextStyle(
+                          fontSize: isDesktop ? 28.0 : 24.0,
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 1.2,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        Visibility(
+          visible: copAnimated && !_checkingSession,
+          child: const _BottomPart(),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A1F44),
+      body: ResponsiveLayout(
+        mobile: _buildSplashStack(context),
+        desktop: DesktopScaffoldFrame(
+          backgroundColor: const Color(0xFF0A1F44),
+          title: '',
+          primaryColor: const Color(0xFF35C2C1),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: _buildSplashStack(context, heightOverride: 700),
             ),
           ),
-
-          // Bottom text & navigation
-          Visibility(
-            visible: copAnimated && !_checkingSession,
-            child: const _BottomPart(),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -195,33 +210,36 @@ class _BottomPart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 900;
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40.0),
+        padding: EdgeInsets.symmetric(horizontal: isDesktop ? 80.0 : 40.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Grow with Us in Faith & Community',
               style: TextStyle(
-                fontSize: 24.0,
+                fontSize: isDesktop ? 28.0 : 24.0,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 25.0),
+            SizedBox(height: isDesktop ? 30.0 : 25.0),
             Text(
               'Stay connected with your congregation — anytime, anywhere.',
               style: TextStyle(
-                fontSize: 15.0,
+                fontSize: isDesktop ? 17.0 : 15.0,
                 color: Colors.white,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 40.0),
+            SizedBox(height: isDesktop ? 50.0 : 40.0),
             Align(
               alignment: Alignment.centerRight,
               child: GestureDetector(
@@ -234,21 +252,21 @@ class _BottomPart extends StatelessWidget {
                   );
                 },
                 child: Container(
-                  height: 85.0,
-                  width: 85.0,
+                  height: isDesktop ? 100.0 : 85.0,
+                  width: isDesktop ? 100.0 : 85.0,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2.0),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.chevron_right,
-                    size: 50.0,
+                    size: isDesktop ? 60.0 : 50.0,
                     color: Colors.white,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 50.0),
+            SizedBox(height: isDesktop ? 60.0 : 50.0),
           ],
         ),
       ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:pcea_church/components/responsive_layout.dart';
 import 'package:pcea_church/components/settings.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
@@ -498,14 +499,14 @@ class BaseDashboardState extends State<BaseDashboard> {
     });
   }
 
-  Widget _buildBody() {
+  Widget _buildBody({required bool isDesktop}) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     switch (_selectedIndex) {
       case 0:
-        return _buildDashboard();
+        return _buildDashboard(isDesktop: isDesktop);
       case 1:
         return const MemberMessagesScreen();
       case 2:
@@ -515,12 +516,12 @@ class BaseDashboardState extends State<BaseDashboard> {
       case 4:
         return const SettingsPage();
       default:
-        return _buildDashboard();
+        return _buildDashboard(isDesktop: isDesktop);
     }
   }
 
-  Widget _buildDashboard() {
-    return SingleChildScrollView(
+  Widget _buildDashboard({required bool isDesktop}) {
+    final content = SingleChildScrollView(
       child: Column(
         children: [
           _buildTopBar(),
@@ -530,6 +531,9 @@ class BaseDashboardState extends State<BaseDashboard> {
         ],
       ),
     );
+
+    if (!isDesktop) return content;
+    return DesktopPageShell(child: content);
   }
 
   void _showNotificationCenter() {
@@ -1122,16 +1126,36 @@ class BaseDashboardState extends State<BaseDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    return ResponsiveLayout(
+      mobile: _buildDashboardScaffold(isDesktop: false),
+      desktop: _buildDashboardScaffold(isDesktop: true),
+    );
+  }
+
+  Widget _buildDashboardScaffold({required bool isDesktop}) {
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        extendBody: true,
-        body: Stack(
-          children: [
-            Positioned.fill(child: _buildBody()),
-            _buildFloatingNavBar(),
-          ],
-        ),
+        extendBody: !isDesktop,
+        body: isDesktop
+            ? Row(
+                children: [
+                  _buildDesktopNavRail(),
+                  Expanded(
+                    child: DesktopScaffoldFrame(
+                      title: '',
+                      primaryColor: const Color(0xFF35C2C1),
+                      child: _buildBody(isDesktop: true),
+                    ),
+                  ),
+                ],
+              )
+            : Stack(
+                children: [
+                  Positioned.fill(child: _buildBody(isDesktop: false)),
+                  _buildFloatingNavBar(),
+                ],
+              ),
       ),
     );
   }
@@ -1194,6 +1218,42 @@ class BaseDashboardState extends State<BaseDashboard> {
       return widgetIcon.icon ?? Icons.circle;
     }
     return Icons.circle;
+  }
+
+  Widget _buildDesktopNavRail() {
+    final items = widget.getBottomNavItems();
+    final selected = _selectedIndex.clamp(0, items.length - 1).toInt();
+
+    return Container(
+      width: 96,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(8, 0),
+          ),
+        ],
+      ),
+      child: NavigationRail(
+        selectedIndex: selected,
+        onDestinationSelected: _onItemTapped,
+        backgroundColor: Colors.transparent,
+        labelType: NavigationRailLabelType.all,
+        destinations: [
+          for (final item in items)
+            NavigationRailDestination(
+              icon: Icon(_iconForItem(item), color: Colors.black45),
+              selectedIcon: Icon(
+                _iconForItem(item),
+                color: widget.getPrimaryColor(),
+              ),
+              label: Text(item.label ?? ''),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildNavItem(IconData icon, String label, int index) {

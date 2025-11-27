@@ -26,6 +26,7 @@ class RoleMiddleware
 
         $user = Auth::user();
         $hasRole = false;
+        $requiredRoles = $this->normalizeRoles($role);
 
         // Check if user is a Member
         if ($user instanceof Member) {
@@ -35,14 +36,17 @@ class RoleMiddleware
             if ($memberRole === 'elder') {
                 $hasRole = true;
             } else {
-                // Check if member has the required role from members.role field
-                $requiredRole = strtolower(trim($role));
-                $hasRole = $memberRole === $requiredRole;
+                $hasRole = in_array($memberRole, $requiredRoles, true);
             }
         }
         // Check if user is an Admin
         elseif ($user instanceof Admin) {
-            $hasRole = $user->hasRole($role);
+            foreach ($requiredRoles as $requiredRole) {
+                if ($user->hasRole($requiredRole)) {
+                    $hasRole = true;
+                    break;
+                }
+            }
         }
         // If user is a regular User, try to find associated Member
         else {
@@ -54,20 +58,37 @@ class RoleMiddleware
                 if ($memberRole === 'elder') {
                     $hasRole = true;
                 } else {
-                    // Check if member has the required role from members.role field
-                    $requiredRole = strtolower(trim($role));
-                    $hasRole = $memberRole === $requiredRole;
+                    $hasRole = in_array($memberRole, $requiredRoles, true);
                 }
             }
         }
 
         if (!$hasRole) {
             return response()->json([
-                'message' => 'Insufficient permissions. Required role: ' . $role
+                'message' => 'Insufficient permissions. Required role: ' . implode('|', $requiredRoles)
             ], 403);
         }
 
         return $next($request);
+    }
+
+    /**
+     * Normalize the role string into an array of lowercase role slugs.
+     */
+    protected function normalizeRoles(string $role): array
+    {
+        $segments = preg_split('/[|,]/', $role) ?: [$role];
+
+        $roles = array_filter(array_map(function ($segment) {
+            return strtolower(trim($segment));
+        }, $segments));
+
+        // If parsing resulted in an empty array, fall back to the original string
+        if (empty($roles)) {
+            $roles[] = strtolower(trim($role));
+        }
+
+        return array_values(array_unique($roles));
     }
 }
 

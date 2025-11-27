@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pcea_church/screen/base_dashboard.dart';
-import 'package:pcea_church/screen/profile.dart';
 import 'package:pcea_church/screen/members.dart';
 import 'package:pcea_church/screen/elder_message_form.dart';
 import 'package:pcea_church/screen/church_contribution.dart';
+import 'package:pcea_church/screen/elder_events_list.dart';
 
 class ElderDashboard extends BaseDashboard {
   const ElderDashboard({super.key});
@@ -46,13 +46,15 @@ class ElderDashboard extends BaseDashboard {
       ),
       DashboardCard(
         icon: Icons.event,
-        title: 'Manage Church Calender',
+        title: 'Manage Church Events',
         color: Colors.teal,
-        subtitle: 'Oversee church activities',
+        subtitle: 'Create and manage events',
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const ProfileScreen()),
+            MaterialPageRoute(
+              builder: (context) => const ElderEventsListScreen(),
+            ),
           );
         },
       ),

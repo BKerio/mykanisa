@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pcea_church/screen/digital_card.dart';
 import 'package:pcea_church/screen/login.dart';
 import 'package:pcea_church/screen/profile.dart';
+import 'package:pcea_church/screen/responsive_sample_page.dart';
 import 'package:pcea_church/screen/view_dependents.dart';
 import 'package:pcea_church/theme/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -191,6 +192,25 @@ class _SettingsPageState extends State<SettingsPage> {
               subtitle: const Text('Sign out of this device'),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: _confirmLogout,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.desktop_windows_rounded),
+              title: const Text('Responsive preview'),
+              subtitle: const Text(
+                'See how layouts adapt on Windows, macOS or Linux',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ResponsiveSamplePage(),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),

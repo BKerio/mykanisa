@@ -210,7 +210,7 @@ class _MembersScreenState extends State<MembersScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
             onPressed: _loadMembers,
             tooltip: 'Refresh',
           ),

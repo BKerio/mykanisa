@@ -5,6 +5,7 @@ import 'package:pcea_church/screen/my_groups.dart';
 import 'package:pcea_church/screen/payments.dart';
 import 'package:pcea_church/screen/member_messages.dart';
 import 'package:pcea_church/screen/pledges.dart';
+import 'package:pcea_church/screen/view_events.dart';
 
 class MemberDashboard extends BaseDashboard {
   const MemberDashboard({super.key});
@@ -89,7 +90,7 @@ class MemberDashboard extends BaseDashboard {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const ChurchEventsScreen()),
+            MaterialPageRoute(builder: (context) => const ViewEventsScreen()),
           );
         },
       ),
@@ -124,37 +125,6 @@ class MemberDashboard extends BaseDashboard {
 }
 
 // Placeholder screens for Member-specific functionality
-class ChurchEventsScreen extends StatelessWidget {
-  const ChurchEventsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Church Events'),
-        backgroundColor: const Color(0xFF35C2C1),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.event, size: 100, color: Colors.grey),
-            SizedBox(height: 20),
-            Text(
-              'Church Events',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'View upcoming church events and activities',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
