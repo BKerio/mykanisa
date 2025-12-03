@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/screen/member_send_message.dart';
 
 class MemberMessagesScreen extends StatefulWidget {
@@ -977,9 +978,24 @@ class _MemberMessagesScreenState extends State<MemberMessagesScreen>
 
   Widget _buildReceivedMessagesTab() {
     return _isLoading
-        ? const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A1F44)),
+        ? Center(
+            child: SpinKitFadingCircle(
+              size: 64,
+              duration: const Duration(milliseconds: 3200),
+              itemBuilder: (context, index) {
+                final palette = [
+                  Colors.black,
+                  const Color(0xFF0A1F44),
+                  Colors.red,
+                  Colors.green,
+                ];
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: palette[index % palette.length],
+                    shape: BoxShape.circle,
+                  ),
+                );
+              },
             ),
           )
         : _error != null

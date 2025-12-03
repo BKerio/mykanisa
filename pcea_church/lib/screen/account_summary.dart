@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -293,7 +294,7 @@ class _LedgerPageState extends State<LedgerPage> {
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
-                  pw.Text('My Kanisa Number: $_ekanisa'),
+                  pw.Text('Kanisa Number: $_ekanisa'),
                   pw.Text('Congregation: $_congregation'),
                   pw.SizedBox(height: 20),
                 ],
@@ -461,13 +462,23 @@ class _LedgerPageState extends State<LedgerPage> {
               foregroundColor: Colors.black87,
               elevation: 4,
               icon: _isExporting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black87,
-                      ),
+                  ? SpinKitFadingCircle(
+                      size: 20,
+                      duration: const Duration(milliseconds: 3200),
+                      itemBuilder: (context, index) {
+                        final palette = [
+                          Colors.black87,
+                          const Color(0xFF0A1F44),
+                          Colors.red,
+                          Colors.green,
+                        ];
+                        return DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: palette[index % palette.length],
+                            shape: BoxShape.circle,
+                          ),
+                        );
+                      },
                     )
                   : const Icon(Icons.picture_as_pdf_outlined),
               label: Text(_isExporting ? 'Generating...' : 'Export PDF'),
@@ -489,7 +500,7 @@ class _LedgerPageState extends State<LedgerPage> {
                     children: [
                       const SizedBox(height: 40),
                       CircleAvatar(
-                        radius: 30,
+                        radius: 36,
                         backgroundColor: Colors.white24,
                         child: _buildProfileAvatarContent(),
                       ),
@@ -513,7 +524,7 @@ class _LedgerPageState extends State<LedgerPage> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'My Kanisa Number: $_ekanisa',
+                          'Kanisa Number: $_ekanisa',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -533,8 +544,25 @@ class _LedgerPageState extends State<LedgerPage> {
           ];
         },
         body: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
+            ? Center(
+                child: SpinKitFadingCircle(
+                  size: 64,
+                  duration: const Duration(milliseconds: 3200),
+                  itemBuilder: (context, index) {
+                    final palette = [
+                      Colors.black,
+                      const Color(0xFF0A1F44),
+                      Colors.red,
+                      Colors.green,
+                    ];
+                    return DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: palette[index % palette.length],
+                        shape: BoxShape.circle,
+                      ),
+                    );
+                  },
+                ),
               )
             : RefreshIndicator(
                 onRefresh: _load,
@@ -869,10 +897,10 @@ class _LedgerPageState extends State<LedgerPage> {
   Widget _buildPledgesSection() {
     // Group pledges by account type to avoid duplicates
     final Map<String, Map<String, dynamic>> groupedPledges = {};
-    
+
     for (var pledge in _pledges) {
       final accountType = pledge['account_type'] ?? 'Others';
-      
+
       if (!groupedPledges.containsKey(accountType)) {
         groupedPledges[accountType] = {
           'account_type': accountType,
@@ -883,16 +911,19 @@ class _LedgerPageState extends State<LedgerPage> {
           'count': 0,
         };
       }
-      
+
       final group = groupedPledges[accountType]!;
-      group['pledge_amount'] = (group['pledge_amount'] as double) + 
+      group['pledge_amount'] =
+          (group['pledge_amount'] as double) +
           _toDouble(pledge['pledge_amount']);
-      group['fulfilled_amount'] = (group['fulfilled_amount'] as double) + 
+      group['fulfilled_amount'] =
+          (group['fulfilled_amount'] as double) +
           _toDouble(pledge['fulfilled_amount']);
-      group['remaining_amount'] = (group['remaining_amount'] as double) + 
+      group['remaining_amount'] =
+          (group['remaining_amount'] as double) +
           _toDouble(pledge['remaining_amount']);
       group['count'] = (group['count'] as int) + 1;
-      
+
       // Determine status: if any is active, show active; if all fulfilled, show fulfilled
       final pledgeStatus = pledge['status'] ?? 'active';
       if (pledgeStatus == 'active' && group['status'] != 'active') {
@@ -903,9 +934,16 @@ class _LedgerPageState extends State<LedgerPage> {
         group['status'] = 'cancelled';
       }
     }
-    
+
     // Sort by account type order
-    final accountTypeOrder = ['Tithe', 'Offering', 'Development', 'Thanksgiving', 'FirstFruit', 'Others'];
+    final accountTypeOrder = [
+      'Tithe',
+      'Offering',
+      'Development',
+      'Thanksgiving',
+      'FirstFruit',
+      'Others',
+    ];
     final sortedPledges = groupedPledges.values.toList()
       ..sort((a, b) {
         final aType = a['account_type'] as String;
@@ -917,7 +955,7 @@ class _LedgerPageState extends State<LedgerPage> {
         if (bIndex == -1) return -1;
         return aIndex.compareTo(bIndex);
       });
-    
+
     // Calculate totals
     double totalPledged = 0;
     double totalFulfilled = 0;
@@ -1078,7 +1116,9 @@ class _LedgerPageState extends State<LedgerPage> {
                           children: [
                             Text(
                               accountType,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             if (count > 1) ...[
                               const SizedBox(width: 6),
@@ -1206,8 +1246,8 @@ class _LedgerPageState extends State<LedgerPage> {
         child: Image.network(
           imageUrl,
           fit: BoxFit.cover,
-          width: 100,
-          height: 100,
+          width: 200,
+          height: 200,
           errorBuilder: (context, error, stackTrace) {
             return Text(
               _fullName.isNotEmpty ? _fullName[0].toUpperCase() : 'M',

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -93,7 +94,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
       // Store the submitted amount before making the request
       final submittedAmount = _totalAmount;
-      
+
       final resp = await API().postRequest(
         url: Uri.parse('${Config.baseUrl}/mpesa/stkpush'),
         data: {
@@ -1145,37 +1146,49 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _submitting ? null : _submit,
-                  icon: _submitting
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                height: 70,
+                child: _submitting
+                    ? Center(
+                        child: SpinKitFadingCircle(
+                          size: 108,
+                          duration: const Duration(milliseconds: 1200),
+                          itemBuilder: (context, index) {
+                            final palette = [
+                              Colors.white,
+                              Color(0xFF0A1F44),
+                              Colors.red,
+                              Colors.green,
+                            ];
+                            return DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: palette[index % palette.length],
+                                shape: BoxShape.circle,
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: _submitting ? null : _submit,
+                        icon: const Icon(Icons.payment),
+                        label: Text(
+                          'Make Contribution - KES ${_totalAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
-                        )
-                      : const Icon(Icons.payment),
-                  label: Text(
-                    _submitting
-                        ? 'Processing...'
-                        : 'Make Contribution - KES ${_totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A1F44),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0A1F44),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
               ),
+              const SizedBox(height: 16),
             ],
           ),
         ),

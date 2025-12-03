@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Member;
 use App\Models\Group;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class MembersController extends Controller
@@ -72,8 +73,57 @@ class MembersController extends Controller
             'telephone' => 'sometimes|string|max:50',
             'email' => 'sometimes|email',
             'role' => 'sometimes|string|in:member,deacon,elder,pastor,secretary,treasurer,choir_leader,youth_leader,chairman,sunday_school_teacher',
+            'assigned_group_id' => 'nullable|exists:groups,id',
         ]);
+        
+        // Special handling for youth_leader role assignment
+        if (isset($validated['role']) && $validated['role'] === 'youth_leader') {
+            if (isset($validated['assigned_group_id'])) {
+                $groupId = $validated['assigned_group_id'];
+                
+                // Verify that the member is actually a member of the group
+                if (!$member->isMemberOfGroup($groupId)) {
+                    return response()->json([
+                        'status' => 400,
+                        'message' => 'Member must be a member of the group before being assigned as youth leader'
+                    ], 400);
+                }
+                
+                // Set the assigned group
+                $validated['assigned_group_id'] = $groupId;
+            } else {
+                // If role is being changed to youth_leader but no group assigned, require it
+                if ($member->role !== 'youth_leader') {
+                    return response()->json([
+                        'status' => 400,
+                        'message' => 'Youth leader must be assigned to a group. Please specify assigned_group_id'
+                    ], 400);
+                }
+            }
+        } else {
+            // If role is being changed from youth_leader, clear assigned group
+            if ($member->role === 'youth_leader' && isset($validated['role']) && $validated['role'] !== 'youth_leader') {
+                $validated['assigned_group_id'] = null;
+            }
+        }
+        
         $member->update($validated);
+        
+        // Also update the corresponding user's name if full_name was updated
+        // This ensures consistency across all related tables (members and users)
+        if (array_key_exists('full_name', $validated)) {
+            $user = User::where('email', $member->email)->first();
+            if ($user) {
+                $user->name = $validated['full_name'];
+                $user->save();
+            }
+        }
+        
+        // Load assigned group relationship if applicable
+        if ($member->role === 'youth_leader' && $member->assigned_group_id) {
+            $member->load('assignedGroup');
+        }
+        
         return $member;
     }
 

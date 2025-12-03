@@ -44,7 +44,7 @@ class LocationController extends Controller
 
     public function getGroups()
     {
-        $groups = Group::orderBy('name')->get(['id','name']);
+        $groups = Group::orderBy('name')->get(['id','name','description']);
         return response()->json(['status' => 200, 'groups' => $groups]);
     }
 }

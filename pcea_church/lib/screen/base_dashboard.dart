@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:pcea_church/components/responsive_layout.dart';
 import 'package:pcea_church/components/settings.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
@@ -401,96 +400,149 @@ class BaseDashboardState extends State<BaseDashboard> {
   }
 
   Future<bool> _onWillPop() async {
-    return await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            backgroundColor: Colors.white,
-            elevation: 12,
-            titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-            contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.logout_rounded,
-                    color: Colors.orange,
-                    size: 26,
-                  ),
+    const Color primaryColor = Color(0xFF0A1F44);
+
+    final bool? result = await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.35),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const SizedBox.shrink(),
+      transitionBuilder: (context, animation, _, __) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+        );
+
+        return ScaleTransition(
+          scale: curved,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 26),
+              padding: const EdgeInsets.fromLTRB(26, 22, 26, 18),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.94),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.5),
+                  width: 1.4,
                 ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Exit the app',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    offset: const Offset(0, 6),
+                    blurRadius: 22,
                   ),
-                ),
-              ],
-            ),
-            content: const Text(
-              'Are you sure you want to exit the app?',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.black54,
-                height: 1.4,
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  // Circular Icon Container
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: primaryColor.withOpacity(0.08),
+                    ),
+                    child: Icon(
+                      Icons.exit_to_app_rounded,
+                      color: primaryColor,
+                      size: 40,
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Title
+                  Text(
+                    'Exit App',
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                      color: primaryColor,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Description
+                  const Text(
+                    'Do you want to close the application?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                      height: 1.35,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+
+                  const SizedBox(height: 26),
+
+                  // Action Buttons
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            backgroundColor: const Color(0xFF0A1F44),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text(
+                            'Stay',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 6,
+                            shadowColor: primaryColor.withOpacity(0.25),
+                            backgroundColor: primaryColor,
+                          ),
+                          child: const Text(
+                            'Exit',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            actions: [
-              TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.grey[700],
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.logout, size: 18, color: Colors.white),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orangeAccent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  elevation: 4,
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                label: const Text(
-                  'Exit',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
           ),
-        ) ??
-        false;
+        );
+      },
+    );
+
+    return result ?? false;
   }
 
   void _onItemTapped(int index) {
@@ -499,14 +551,14 @@ class BaseDashboardState extends State<BaseDashboard> {
     });
   }
 
-  Widget _buildBody({required bool isDesktop}) {
+  Widget _buildBody() {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     switch (_selectedIndex) {
       case 0:
-        return _buildDashboard(isDesktop: isDesktop);
+        return _buildDashboard();
       case 1:
         return const MemberMessagesScreen();
       case 2:
@@ -516,12 +568,12 @@ class BaseDashboardState extends State<BaseDashboard> {
       case 4:
         return const SettingsPage();
       default:
-        return _buildDashboard(isDesktop: isDesktop);
+        return _buildDashboard();
     }
   }
 
-  Widget _buildDashboard({required bool isDesktop}) {
-    final content = SingleChildScrollView(
+  Widget _buildDashboard() {
+    return SingleChildScrollView(
       child: Column(
         children: [
           _buildTopBar(),
@@ -531,9 +583,6 @@ class BaseDashboardState extends State<BaseDashboard> {
         ],
       ),
     );
-
-    if (!isDesktop) return content;
-    return DesktopPageShell(child: content);
   }
 
   void _showNotificationCenter() {
@@ -1126,36 +1175,16 @@ class BaseDashboardState extends State<BaseDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveLayout(
-      mobile: _buildDashboardScaffold(isDesktop: false),
-      desktop: _buildDashboardScaffold(isDesktop: true),
-    );
-  }
-
-  Widget _buildDashboardScaffold({required bool isDesktop}) {
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        extendBody: !isDesktop,
-        body: isDesktop
-            ? Row(
-                children: [
-                  _buildDesktopNavRail(),
-                  Expanded(
-                    child: DesktopScaffoldFrame(
-                      title: '',
-                      primaryColor: const Color(0xFF35C2C1),
-                      child: _buildBody(isDesktop: true),
-                    ),
-                  ),
-                ],
-              )
-            : Stack(
-                children: [
-                  Positioned.fill(child: _buildBody(isDesktop: false)),
-                  _buildFloatingNavBar(),
-                ],
-              ),
+        extendBody: true,
+        body: Stack(
+          children: [
+            Positioned.fill(child: _buildBody()),
+            _buildFloatingNavBar(),
+          ],
+        ),
       ),
     );
   }
@@ -1218,42 +1247,6 @@ class BaseDashboardState extends State<BaseDashboard> {
       return widgetIcon.icon ?? Icons.circle;
     }
     return Icons.circle;
-  }
-
-  Widget _buildDesktopNavRail() {
-    final items = widget.getBottomNavItems();
-    final selected = _selectedIndex.clamp(0, items.length - 1).toInt();
-
-    return Container(
-      width: 96,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(8, 0),
-          ),
-        ],
-      ),
-      child: NavigationRail(
-        selectedIndex: selected,
-        onDestinationSelected: _onItemTapped,
-        backgroundColor: Colors.transparent,
-        labelType: NavigationRailLabelType.all,
-        destinations: [
-          for (final item in items)
-            NavigationRailDestination(
-              icon: Icon(_iconForItem(item), color: Colors.black45),
-              selectedIcon: Icon(
-                _iconForItem(item),
-                color: widget.getPrimaryColor(),
-              ),
-              label: Text(item.label ?? ''),
-            ),
-        ],
-      ),
-    );
   }
 
   Widget _buildNavItem(IconData icon, String label, int index) {

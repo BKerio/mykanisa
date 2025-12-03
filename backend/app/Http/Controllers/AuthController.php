@@ -55,6 +55,7 @@ class AuthController extends Controller
         }
 
         if ($user && Hash::check($password, $user->password)) {
+            // Create token without expiration (tokens never expire unless explicitly deleted on logout)
             $token = $user->createToken('Personal Access Token')->plainTextToken;
 
             $member = Member::where('email', $user->email)->first();

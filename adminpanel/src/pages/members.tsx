@@ -239,27 +239,144 @@ const MembersPage = () => {
 
   const updateRole = async (member: MemberDto, newRole: string) => {
     const prevRole = member.role || "member";
+    const API_URL = import.meta.env.VITE_API_URL;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const headers = { Authorization: `Bearer ${token}` };
     
-    const confirm = await Swal.fire({
-      title: `<span class="text-xl font-bold text-slate-800">Promote Member?</span>`,
-      html: `<p class="text-slate-600">Change <b>${member.full_name}</b> from <span class="font-mono text-xs bg-slate-100 p-1 rounded">${prevRole}</span> to <span class="font-mono text-xs bg-blue-50 text-blue-900 p-1 rounded">${newRole}</span>?</p>`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Confirm Change",
-      confirmButtonColor: "#172554", // blue-950
-      cancelButtonColor: "#94a3b8",
-      background: "#fff",
-      customClass: { popup: "rounded-2xl" }
-    });
+    // If assigning youth_leader role, show group selection
+    if (newRole === 'youth_leader') {
+      try {
+        // Fetch all groups
+        const groupsRes = await axios.get(`${API_URL}/groups`, { headers });
+        const groups = groupsRes.data?.groups || [];
+        
+        if (groups.length === 0) {
+          Swal.fire({ 
+            icon: "error", 
+            title: "No Groups Available", 
+            text: "Please create groups first before assigning youth leaders.",
+            confirmButtonColor: "#172554"
+          });
+          return;
+        }
+        
+        // Get member's group names from the member object
+        const memberGroupNames = member.group_names || [];
+        
+        // Create options HTML for groups, highlighting which ones the member belongs to
+        const groupOptions = groups.map((g: any) => {
+          const isMember = memberGroupNames.includes(g.name);
+          return `<option value="${g.id}" ${!isMember ? 'disabled' : ''}>${g.name}${!isMember ? ' (Not a member)' : ''}</option>`;
+        }).join('');
+        
+        const result = await Swal.fire({
+          title: `<span class="text-xl font-bold text-slate-800">Assign Youth Leader Role</span>`,
+          html: `
+            <p class="text-slate-600 mb-4">Change <b>${member.full_name}</b> to <span class="font-mono text-xs bg-blue-50 text-blue-900 p-1 rounded">${newRole}</span>?</p>
+            <p class="text-xs text-slate-500 mb-3">Select the group this youth leader will be assigned to. The member must already be a member of the selected group.</p>
+            <select id="group-select" class="swal2-input" style="display: block; width: 100%; padding: 0.5rem; margin-top: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.5rem;">
+              <option value="">-- Select Group --</option>
+              ${groupOptions}
+            </select>
+          `,
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Confirm Assignment",
+          confirmButtonColor: "#172554",
+          cancelButtonColor: "#94a3b8",
+          background: "#fff",
+          customClass: { popup: "rounded-2xl" },
+          didOpen: () => {
+            const select = document.getElementById('group-select') as HTMLSelectElement;
+            if (select) {
+              select.focus();
+            }
+          },
+          preConfirm: () => {
+            const select = document.getElementById('group-select') as HTMLSelectElement;
+            const selectedGroupId = select?.value;
+            if (!selectedGroupId) {
+              Swal.showValidationMessage('Please select a group');
+              return false;
+            }
+            return selectedGroupId;
+          }
+        });
 
-    if (!confirm.isConfirmed) return;
+        if (!result.isConfirmed || !result.value) return;
 
-    try {
-      await axios.put(`${API_URL}/admin/members/${member.id}`, { role: newRole }, { headers: { Authorization: `Bearer ${token}` } });
-      setRows((prev) => prev.map((r) => (r.id === member.id ? { ...r, role: newRole } : r)));
-      Swal.fire({ icon: "success", title: "Role Updated", timer: 1500, showConfirmButton: false, toast: true, position: 'top-end' });
-    } catch {
-      // Revert on error
+        const selectedGroupId = parseInt(result.value as string);
+        
+        // Verify member is part of selected group
+        const selectedGroup = groups.find((g: any) => g.id === selectedGroupId);
+        const memberGroupNames = member.group_names || [];
+        
+        if (!selectedGroup || !memberGroupNames.includes(selectedGroup.name)) {
+          Swal.fire({ 
+            icon: "error", 
+            title: "Validation Error", 
+            text: `Member must be a member of "${selectedGroup?.name}" before being assigned as youth leader.`,
+            confirmButtonColor: "#172554"
+          });
+          return;
+        }
+
+        // Update role with assigned group
+        try {
+          await axios.put(
+            `${API_URL}/admin/members/${member.id}`, 
+            { role: newRole, assigned_group_id: selectedGroupId }, 
+            { headers }
+          );
+          setRows((prev) => prev.map((r) => (r.id === member.id ? { ...r, role: newRole } : r)));
+          Swal.fire({ 
+            icon: "success", 
+            title: "Role Updated", 
+            text: `${member.full_name} is now youth leader for ${selectedGroup?.name}`,
+            timer: 2000, 
+            showConfirmButton: false, 
+            toast: true, 
+            position: 'top-end' 
+          });
+        } catch (error: any) {
+          Swal.fire({ 
+            icon: "error", 
+            title: "Update Failed", 
+            text: error?.response?.data?.message || "Failed to update role. Member may not be part of selected group.",
+            confirmButtonColor: "#172554"
+          });
+        }
+      } catch (error: any) {
+        Swal.fire({ 
+          icon: "error", 
+          title: "Error", 
+          text: error?.response?.data?.message || "Failed to load groups",
+          confirmButtonColor: "#172554"
+        });
+      }
+    } else {
+      // For other roles, use simple confirmation
+      const confirm = await Swal.fire({
+        title: `<span class="text-xl font-bold text-slate-800">Update Role?</span>`,
+        html: `<p class="text-slate-600">Change <b>${member.full_name}</b> from <span class="font-mono text-xs bg-slate-100 p-1 rounded">${prevRole}</span> to <span class="font-mono text-xs bg-blue-50 text-blue-900 p-1 rounded">${newRole}</span>?</p>`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Confirm Change",
+        confirmButtonColor: "#172554",
+        cancelButtonColor: "#94a3b8",
+        background: "#fff",
+        customClass: { popup: "rounded-2xl" }
+      });
+
+      if (!confirm.isConfirmed) return;
+
+      try {
+        await axios.put(`${API_URL}/admin/members/${member.id}`, { role: newRole }, { headers });
+        setRows((prev) => prev.map((r) => (r.id === member.id ? { ...r, role: newRole } : r)));
+        Swal.fire({ icon: "success", title: "Role Updated", timer: 1500, showConfirmButton: false, toast: true, position: 'top-end' });
+      } catch {
+        // Revert on error
+      }
     }
   };
 

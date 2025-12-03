@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Elder;
 use App\Http\Controllers\Controller;
 use App\Models\Member;
 use App\Models\Group;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class MembersController extends Controller
@@ -92,6 +93,17 @@ class MembersController extends Controller
             'role' => 'sometimes|string|in:member,deacon,elder,pastor,secretary,treasurer,choir_leader,youth_leader,chairman,sunday_school_teacher',
         ]);
         $member->update($validated);
+        
+        // Also update the corresponding user's name if full_name was updated
+        // This ensures consistency across all related tables (members and users)
+        if (array_key_exists('full_name', $validated)) {
+            $user = User::where('email', $member->email)->first();
+            if ($user) {
+                $user->name = $validated['full_name'];
+                $user->save();
+            }
+        }
+        
         $member->group_names = $this->getGroupNames($member->groups);
         return $member;
     }

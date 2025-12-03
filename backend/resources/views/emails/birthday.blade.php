@@ -15,7 +15,7 @@
     <p class="title">Happy Birthday, {{ $firstName }}! 🎉</p>
     <p>Wishing you a blessed and joyful year ahead. May God’s grace and love surround you today and always.</p>
     <p>Warm wishes from {{ $congregation }}.</p>
-    <div class="footer">PCEA e‑Kanisa</div>
+    <div class="footer">PCEA My Kanisa APP</div>
   </div>
 </body>
 </html>

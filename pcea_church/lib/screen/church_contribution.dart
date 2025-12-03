@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
@@ -192,9 +193,13 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Church Contributions'),
-        backgroundColor: const Color(0xFF2E7D32),
+        backgroundColor: Color(0xFF0A1F44),
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+        title: Text(
+          "Church Contributions.",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.normal),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -205,6 +210,7 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
             tooltip: 'Refresh',
           ),
         ],
+        centerTitle: false,
       ),
       body: Column(
         children: [
@@ -360,11 +366,24 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
           // Content
           Expanded(
             child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF2E7D32),
-                      ),
+                ? Center(
+                    child: SpinKitFadingCircle(
+                      size: 64,
+                      duration: const Duration(milliseconds: 3200),
+                      itemBuilder: (context, index) {
+                        final palette = [
+                          Colors.black,
+                          const Color(0xFF0A1F44),
+                          Colors.red,
+                          Colors.green,
+                        ];
+                        return DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: palette[index % palette.length],
+                            shape: BoxShape.circle,
+                          ),
+                        );
+                      },
                     ),
                   )
                 : _error != null

@@ -13,14 +13,23 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
+        $member = \App\Models\Member::where('email', $user->email)->first();
         
-        if (!$user->hasRole('youth_leader')) {
+        if (!$member || $member->role !== 'youth_leader') {
             return response()->json(['message' => 'Access denied. Youth Leader role required.'], 403);
+        }
+
+        // Load assigned group if exists
+        $assignedGroup = null;
+        if ($member->assigned_group_id) {
+            $assignedGroup = $member->assignedGroup()->first(['id', 'name', 'description']);
         }
 
         return response()->json([
             'status' => 200,
             'user' => $user,
+            'member' => $member->only(['id', 'full_name', 'email', 'assigned_group_id']),
+            'assigned_group' => $assignedGroup,
             'roles' => $user->activeRoles()->get(),
             'permissions' => $user->activeRoles()->with('permissions')->get()->pluck('permissions')->flatten()->unique('id'),
         ]);

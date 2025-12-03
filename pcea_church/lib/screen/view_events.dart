@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:pcea_church/components/responsive_layout.dart';
 import 'package:pcea_church/config/server.dart';
@@ -254,10 +255,24 @@ class _ViewEventsScreenState extends State<ViewEventsScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: CircularProgressIndicator(),
+      return Center(
+        child: SpinKitFadingCircle(
+          size: 64,
+          duration: const Duration(milliseconds: 3200),
+          itemBuilder: (context, index) {
+            final palette = [
+              Colors.black,
+              const Color(0xFF0A1F44),
+              Colors.red,
+              Colors.green,
+            ];
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: palette[index % palette.length],
+                shape: BoxShape.circle,
+              ),
+            );
+          },
         ),
       );
     }

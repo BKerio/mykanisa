@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 
@@ -19,6 +20,7 @@ class _MemberSendMessageScreenState extends State<MemberSendMessageScreen> {
 
   bool _isLoading = false;
   bool _isLoadingElders = false;
+  final primaryColor = const Color(0xFF0A1F44);
   List<Map<String, dynamic>> _elders = [];
   List<Map<String, dynamic>> _filteredElders = [];
   int? _selectedElderId;
@@ -542,45 +544,55 @@ class _MemberSendMessageScreenState extends State<MemberSendMessageScreen> {
               const SizedBox(height: 24),
 
               // Send Button
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _sendMessage,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A1F44),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
-                            ),
+              if (_isLoading)
+                SizedBox(
+                  width: double.infinity,
+                  height: 70,
+                  child: Center(
+                    child: SpinKitFadingCircle(
+                      size: 108,
+                      duration: const Duration(milliseconds: 3200),
+                      itemBuilder: (context, index) {
+                        final palette = [
+                          Colors.black,
+                          Color(0xFF0A1F44),
+                          Colors.red,
+                          Colors.green,
+                        ];
+                        return DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: palette[index % palette.length],
+                            shape: BoxShape.circle,
                           ),
-                        )
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.send, size: 24),
-                            SizedBox(width: 12),
-                            Text(
-                              'Send Message',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
+                        );
+                      },
+                    ),
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: _sendMessage,
+                    child: const Text(
+                      "Login to your account",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              const SizedBox(height: 16),
             ],
           ),
         ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 
@@ -223,7 +224,26 @@ class _MembersScreenState extends State<MembersScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: SpinKitFadingCircle(
+          size: 64,
+          duration: const Duration(milliseconds: 3200),
+          itemBuilder: (context, index) {
+            final palette = [
+              Colors.black,
+              const Color(0xFF0A1F44),
+              Colors.red,
+              Colors.green,
+            ];
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: palette[index % palette.length],
+                shape: BoxShape.circle,
+              ),
+            );
+          },
+        ),
+      );
     }
 
     if (_error != null) {

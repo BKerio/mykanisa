@@ -407,6 +407,13 @@ class DashboardController extends Controller
             $query->select('id', 'full_name', 'email', 'role');
         }]);
 
+        // Broadcast notification event
+        try {
+            broadcast(new \App\Events\AnnouncementCreated($announcement));
+        } catch (\Exception $e) {
+            \Log::warning('Failed to broadcast announcement notification', ['error' => $e->getMessage()]);
+        }
+
         return response()->json([
             'status' => 200,
             'message' => 'Message sent to elder successfully',

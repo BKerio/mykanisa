@@ -1,8 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
+import 'package:pcea_church/screen/group_activities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// --- Constants ---
+const Color kPrimaryColor = Color(0xFF0A1F44);
+const String kDefaultGroupName = 'Unnamed Group';
+const String kDefaultGroupDescription = 'No description available';
 
 class MyGroupsScreen extends StatefulWidget {
   const MyGroupsScreen({super.key});
@@ -12,30 +19,40 @@ class MyGroupsScreen extends StatefulWidget {
 }
 
 class _MyGroupsScreenState extends State<MyGroupsScreen> {
-  bool loading = true;
-  String error = '';
-  List<Map<String, dynamic>> allGroups = [];
-  List<int> myGroupIds = [];
+  // State variables
+  bool _isLoading = true;
+  String _errorMessage = '';
+  List<Map<String, dynamic>> _allGroups = [];
+  List<int> _myGroupIds = [];
+
+  // --- Initialization ---
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadData();
   }
 
-  Future<void> _load() async {
+  // --- Data Fetching Logic ---
+
+  Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() {
-      loading = true;
-      error = '';
+      _isLoading = true;
+      _errorMessage = '';
     });
     try {
+      // Fetch both groups and member data concurrently
       await Future.wait([_fetchAllGroups(), _fetchMemberGroups()]);
     } catch (e) {
-      error = 'Failed to load groups';
+      // Catch any unhandled exceptions during loading
+      _errorMessage = 'A network error occurred. Please try again.';
+      debugPrint('Load Error: $e');
     }
+
     if (mounted) {
       setState(() {
-        loading = false;
+        _isLoading = false;
       });
     }
   }
@@ -44,37 +61,46 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
     final res = await API().getRequest(
       url: Uri.parse('${Config.baseUrl}/groups'),
     );
+
     if (res.statusCode == 200) {
       final body = jsonDecode(res.body) as Map<String, dynamic>;
-      if ((body['status'] ?? 400) == 200) {
-        allGroups = List<Map<String, dynamic>>.from(body['groups'] as List);
+      if ((body['status'] ?? 400) == 200 && body['groups'] is List) {
+        _allGroups = List<Map<String, dynamic>>.from(
+          body['groups'] as List? ?? [],
+        );
+        return;
       }
     }
+    // Handle specific API error responses if needed, otherwise let the main try/catch handle failure
   }
 
   Future<void> _fetchMemberGroups() async {
     final prefs = await SharedPreferences.getInstance();
+    String groupsJson = '';
+
     try {
       final res = await API().getRequest(
         url: Uri.parse('${Config.baseUrl}/members/me'),
       );
+
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
         if ((body['status'] ?? 400) == 200) {
           final m = (body['member'] ?? {}) as Map<String, dynamic>;
-          final groupsJson = (m['groups'] ?? '') as String;
-          myGroupIds = _decodeGroupIds(groupsJson);
+          groupsJson = (m['groups'] ?? '') as String;
           await prefs.setString('member_groups_json', groupsJson);
-          return;
         }
       }
-      // fallback to cache
-      final cached = prefs.getString('member_groups_json') ?? '';
-      myGroupIds = _decodeGroupIds(cached);
-    } catch (_) {
-      final cached = prefs.getString('member_groups_json') ?? '';
-      myGroupIds = _decodeGroupIds(cached);
+    } catch (e) {
+      debugPrint('Error fetching member groups from API: $e');
     }
+
+    // Use cached data if API failed or returned empty
+    if (groupsJson.isEmpty) {
+      groupsJson = prefs.getString('member_groups_json') ?? '';
+    }
+
+    _myGroupIds = _decodeGroupIds(groupsJson);
   }
 
   List<int> _decodeGroupIds(String groupsJson) {
@@ -82,6 +108,7 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
     try {
       final list = jsonDecode(groupsJson);
       if (list is List) {
+        // Ensure conversion is robust: handles strings or numbers in the list
         return list
             .map((e) => int.tryParse(e.toString()) ?? -1)
             .where((e) => e > 0)
@@ -93,18 +120,20 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
     }
   }
 
-  List<Map<String, dynamic>> get myGroups {
-    if (myGroupIds.isEmpty) return [];
-    final ids = Set<int>.from(myGroupIds);
-    return allGroups
-        .where((g) => ids.contains((g['id'] as num).toInt()))
+  // --- Computed Property ---
+
+  List<Map<String, dynamic>> get _myGroups {
+    if (_myGroupIds.isEmpty) return [];
+    final ids = Set<int>.from(_myGroupIds);
+    return _allGroups
+        .where((g) => ids.contains((g['id'] as num?)?.toInt() ?? 0))
         .toList();
   }
 
+  // --- UI Building ---
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
@@ -117,43 +146,82 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: loading ? null : _load,
+            onPressed: _isLoading ? null : _loadData,
             icon: const Icon(Icons.refresh, color: Colors.black87),
             tooltip: 'Refresh',
           ),
         ],
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : error.isNotEmpty
-          ? _errorState()
-          : myGroups.isEmpty
-          ? _emptyState()
-          : _groupsGrid(theme),
+      body: _buildBody(),
     );
   }
 
-  Widget _errorState() {
+  Widget _buildBody() {
+    if (_isLoading) {
+      return _buildLoadingState();
+    }
+    if (_errorMessage.isNotEmpty) {
+      return _buildErrorState();
+    }
+    if (_myGroups.isEmpty) {
+      return _buildEmptyState();
+    }
+    return _buildGroupsGrid();
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: SpinKitFadingCircle(
+        size: 64,
+        duration: const Duration(milliseconds: 1800), // Adjusted duration
+        itemBuilder: (context, index) {
+          final palette = [
+            kPrimaryColor,
+            Colors.red,
+            Colors.blue,
+            Colors.green,
+          ];
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: palette[index % palette.length],
+              shape: BoxShape.circle,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 64),
-            const SizedBox(height: 12),
-            Text(error, style: const TextStyle(fontSize: 16)),
+            const Icon(Icons.cloud_off, color: Colors.redAccent, size: 72),
             const SizedBox(height: 16),
+            Text(
+              _errorMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+            const SizedBox(height: 24),
             ElevatedButton.icon(
               icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              label: const Text('Retry Loading'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
+                backgroundColor: kPrimaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: _load,
+              onPressed: _loadData,
             ),
           ],
         ),
@@ -161,24 +229,32 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
     );
   }
 
-  Widget _emptyState() {
+  Widget _buildEmptyState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.groups_outlined, size: 80, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'No Groups Found',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          children: [
+            Icon(
+              Icons.people_alt_outlined,
+              size: 80,
+              color: Colors.grey.shade400,
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 16),
+            const Text(
+              'No Groups Assigned',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
             Text(
-              'You are not assigned to any group yet.\nPlease contact your church leadership for assistance.',
+              'You are not currently assigned to any group. If this is unexpected, please contact your church leadership for enrollment.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
           ],
         ),
@@ -186,99 +262,111 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
     );
   }
 
-  Widget _groupsGrid(ThemeData theme) {
+  Widget _buildGroupsGrid() {
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _loadData,
+      color: kPrimaryColor,
       child: GridView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: myGroups.length,
+        itemCount: _myGroups.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          childAspectRatio: 1.1,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.95, // Slightly taller cards
         ),
         itemBuilder: (context, index) {
-          final g = myGroups[index];
-          final name = g['name'] ?? 'Unnamed Group';
-          final description = g['description'] ?? 'No description available';
+          final g = _myGroups[index];
+          return _buildGroupCard(g);
+        },
+      ),
+    );
+  }
 
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: InkWell(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Opening "$name"'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Card(
-                elevation: 3,
-                shadowColor: Colors.blueAccent.withOpacity(0.2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue.shade50, Colors.white],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: Colors.blueAccent.withOpacity(0.15),
-                        radius: 24,
-                        child: const Icon(
-                          Icons.groups,
-                          color: Color(0xFF0A1F44),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        description,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black54,
-                        ),
-                      ),
-                      const Spacer(),
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: Icon(
-                          Icons.arrow_forward_ios,
-                          size: 16,
-                          color: Color(0xFF0A1F44),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+  Widget _buildGroupCard(Map<String, dynamic> groupData) {
+    final groupId = (groupData['id'] as num?)?.toInt() ?? 0;
+    final name = groupData['name'] ?? kDefaultGroupName;
+    final description = groupData['description'] ?? kDefaultGroupDescription;
+
+    return InkWell(
+      onTap: () {
+        if (groupId > 0) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GroupActivitiesScreen(
+                groupId: groupId,
+                groupName: name,
+                groupDescription: description != kDefaultGroupDescription
+                    ? description
+                    : null,
               ),
             ),
           );
-        },
+        }
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Card(
+        elevation: 5,
+        shadowColor: kPrimaryColor.withOpacity(0.15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.blue.shade50, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Group Icon
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kPrimaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.people_alt_sharp,
+                  color: kPrimaryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Group Name
+              Text(
+                name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: kPrimaryColor,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              // Group Description
+              Expanded(
+                child: Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ),
+              // Action Indicator
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Icon(
+                  Icons.arrow_right_alt,
+                  size: 28,
+                  color: kPrimaryColor.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

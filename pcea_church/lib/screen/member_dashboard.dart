@@ -6,6 +6,7 @@ import 'package:pcea_church/screen/payments.dart';
 import 'package:pcea_church/screen/member_messages.dart';
 import 'package:pcea_church/screen/pledges.dart';
 import 'package:pcea_church/screen/view_events.dart';
+import 'package:pcea_church/screen/member_youth_leader_message.dart';
 
 class MemberDashboard extends BaseDashboard {
   const MemberDashboard({super.key});
@@ -22,7 +23,7 @@ class MemberDashboard extends BaseDashboard {
     return [
       DashboardCard(
         icon: Icons.account_balance_wallet_rounded,
-        title: 'My Account summary',
+        title: 'My Kanisa Contribution Summary',
         color: Colors.teal,
         subtitle: 'View & edit profile',
         onTap: () {
@@ -42,6 +43,20 @@ class MemberDashboard extends BaseDashboard {
             context,
             MaterialPageRoute(
               builder: (context) => const MemberMessagesScreen(),
+            ),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.group,
+        title: 'Message Youth Leader',
+        color: Colors.orange,
+        subtitle: 'Contact your group leader',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MemberYouthLeaderMessageScreen(),
             ),
           );
         },
@@ -115,10 +130,10 @@ class MemberDashboard extends BaseDashboard {
   }
 
   @override
-  Color getPrimaryColor() => const Color(0xFF35C2C1); // Teal
+  Color getPrimaryColor() => const Color(0xFF20BBA6);
 
   @override
-  Color getSecondaryColor() => const Color(0xFF20BBA6); // Dark Teal
+  Color getSecondaryColor() => const Color(0xFF20BBA6);
 
   @override
   IconData getRoleIcon() => Icons.person;

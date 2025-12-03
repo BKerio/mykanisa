@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/components/responsive_layout.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
@@ -23,8 +24,58 @@ class _LoginState extends State<Login> {
   String _loginMode = 'Use your email address';
   bool isLoading = false;
   bool _obscurePassword = true;
+  bool _isCheckingAutoLogin = true;
 
-  final primaryColor = const Color(0xFF0A1F44); // Dark blue
+  final primaryColor = const Color(0xFF0A1F44);
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAutoLogin();
+  }
+
+  // ---- Auto Login Check ----
+  Future<void> _checkAutoLogin() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token != null && token.isNotEmpty) {
+        // Validate token by making an authenticated request
+        try {
+          final result = await API().getRequest(
+            url: Uri.parse('${Config.baseUrl}/members/me'),
+          );
+
+          if (result.statusCode == 200) {
+            final response = jsonDecode(result.body) as Map<String, dynamic>;
+            if ((response['status'] ?? 200) == 200) {
+              // Token is valid, auto-login
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const Home()),
+                );
+                return;
+              }
+            }
+          }
+        } catch (e) {
+          // Token is invalid or expired, clear it and show login form
+          await prefs.remove('token');
+        }
+      }
+    } catch (e) {
+      // Error checking auto-login, just show login form
+      debugPrint('Auto-login check error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingAutoLogin = false;
+        });
+      }
+    }
+  }
 
   // ---- Login API ----
   void loginUser() async {
@@ -268,30 +319,54 @@ class _LoginState extends State<Login> {
             ),
           ),
           const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              onPressed: isLoading ? null : loginUser,
-              child: isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      "Login to your account",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+          if (isLoading)
+            SizedBox(
+              width: double.infinity,
+              height: 70,
+              child: Center(
+                child: SpinKitFadingCircle(
+                  size: 108,
+                  duration: const Duration(milliseconds: 3200),
+                  itemBuilder: (context, index) {
+                    final palette = [
+                      Colors.black,
+                      Color(0xFF0A1F44),
+                      Colors.red,
+                      Colors.green,
+                    ];
+                    return DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: palette[index % palette.length],
+                        shape: BoxShape.circle,
                       ),
-                    ),
+                    );
+                  },
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: loginUser,
+                child: const Text(
+                  "Login to your account",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ),
-          ),
           const SizedBox(height: 16),
           TextButton(
             onPressed: () => Navigator.push(
@@ -359,7 +434,7 @@ class _LoginState extends State<Login> {
 
   Widget _buildDesktopLayout() {
     return DesktopScaffoldFrame(
-      title: '',
+      title: 'Login Page',
       primaryColor: const Color(0xFF35C2C1),
       child: SafeArea(
         child: Center(
@@ -377,6 +452,33 @@ class _LoginState extends State<Login> {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while checking auto-login
+    if (_isCheckingAutoLogin) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFE8F4FD),
+        body: Center(
+          child: SpinKitFadingCircle(
+            size: 64,
+            duration: const Duration(milliseconds: 3200),
+            itemBuilder: (context, index) {
+              final palette = [
+                Colors.black,
+                const Color(0xFF0A1F44),
+                Colors.red,
+                Colors.green,
+              ];
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  color: palette[index % palette.length],
+                  shape: BoxShape.circle,
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFE8F4FD),
       body: ResponsiveLayout(

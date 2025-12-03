@@ -1,18 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import {
-  ChurchIcon,
-  LayoutDashboard,
-  LogOut,
-  LucideUserCircle2,
-  Users,
-  MapPin,
-  Building2,
-  Church,
-  ArrowRight,
-  EuroIcon,
-  Settings
-} from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
+import { ChurchIcon, LayoutDashboard, LogOut, LucideUserCircle2, Users, MapPin, Building2, Church, ArrowRight, EuroIcon, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface UserProfile {
@@ -21,7 +10,7 @@ interface UserProfile {
 }
 
 interface SidebarProps {
-  user: UserProfile; // Kept in interface just in case needed for future logic, though visuals are removed
+  user: UserProfile;
   sidebarOpen: boolean;
   isMobile: boolean;
   onLogout: () => void;
@@ -62,6 +51,11 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
 
     if (result.isConfirmed) {
       onLogout();
+
+      // Toast message after logout
+      toast.success('Logged out successfully.');
+
+      // You can navigate here if needed
     }
   };
 
@@ -84,6 +78,17 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
 
   return (
     <>
+      {/* Toast at bottom */}
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          style: {
+            fontSize: '1rem',
+            padding: '14px 18px'
+          }
+        }}
+      />
+
       {/* Mobile Backdrop */}
       <AnimatePresence>
         {isMobile && sidebarOpen && (
@@ -102,20 +107,17 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
         animate={isMobile ? (sidebarOpen ? "mobileOpen" : "mobileClosed") : (sidebarOpen ? "expanded" : "collapsed")}
         variants={sidebarVariants}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className={`
+        className="
           fixed md:relative z-50 h-full
           bg-white dark:bg-slate-950
           border-r border-slate-200 dark:border-slate-800
           flex flex-col shadow-2xl md:shadow-none
-        `}
+        "
       >
-        {/* Top Spacing / Decorative Element */}
         <div className="h-6 w-full" />
 
-        {/* Navigation Area */}
+        {/* Navigation */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-4 space-y-2 custom-scrollbar">
-          
-          {/* Section Label (Only visible when expanded) */}
           <AnimatePresence>
             {sidebarOpen && (
               <motion.div
@@ -131,7 +133,7 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
 
           {sidebarNavLinks.map((link, i) => {
             const isActive = location.pathname === link.path;
-            
+
             return (
               <Link
                 key={link.path}
@@ -146,14 +148,13 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
                   animate="visible"
                   className={`
                     relative flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-300
-                    ${isActive 
-                      ? 'bg-blue-50/80 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' 
+                    ${isActive
+                      ? 'bg-blue-50/80 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
                       : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
                     }
                     ${!sidebarOpen ? 'justify-center' : ''}
                   `}
                 >
-                  {/* Active "Glow" Line */}
                   {isActive && (
                     <motion.div
                       layoutId="activeIndicator"
@@ -161,18 +162,14 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
                     />
                   )}
 
-                  {/* Icon */}
                   <motion.div
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     className="relative z-10"
                   >
-                    <link.icon 
-                      className={`w-[22px] h-[22px] transition-all duration-300 ${isActive ? 'stroke-[2.5px]' : 'stroke-[1.5px]'}`} 
-                    />
+                    <link.icon className={`w-[22px] h-[22px] transition-all duration-300 ${isActive ? 'stroke-[2.5px]' : 'stroke-[1.5px]'}`} />
                   </motion.div>
 
-                  {/* Text Label */}
                   <AnimatePresence mode="wait">
                     {sidebarOpen && (
                       <motion.span
@@ -187,7 +184,6 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
                     )}
                   </AnimatePresence>
 
-                  {/* Active Arrow (Subtle detail) */}
                   {sidebarOpen && isActive && (
                     <motion.div
                       initial={{ opacity: 0, x: -10 }}
@@ -198,13 +194,11 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
                     </motion.div>
                   )}
 
-                  {/* Floating Tooltip for Collapsed State */}
                   {!sidebarOpen && !isMobile && (
-                     <div className="absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 translate-x-2 group-hover:translate-x-0 shadow-xl z-50 whitespace-nowrap">
-                       {link.name}
-                       {/* Tiny Triangle Pointer */}
-                       <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-slate-900 dark:border-r-white" />
-                     </div>
+                    <div className="absolute left-[calc(100 percent +10px)] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 translate-x-2 group-hover:translate-x-0 shadow-xl z-50 whitespace-nowrap">
+                      {link.name}
+                      <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-slate-900 dark:border-r-white" />
+                    </div>
                   )}
                 </motion.div>
               </Link>
@@ -212,7 +206,7 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
           })}
         </div>
 
-        {/* Footer Area */}
+        {/* Logout */}
         <div className="p-4 border-t border-slate-100 dark:border-slate-800/50">
           <button
             onClick={handleLogout}
@@ -223,9 +217,9 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
             `}
           >
             <div className="relative z-10">
-               <LogOut className="w-[22px] h-[22px] stroke-[1.5px] group-hover:stroke-[2px] transition-all" />
+              <LogOut className="w-[22px] h-[22px] stroke-[1.5px] group-hover:stroke-[2px] transition-all" />
             </div>
-            
+
             {sidebarOpen && (
               <motion.span
                 initial={{ opacity: 0 }}
@@ -235,8 +229,7 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
                 Log Out
               </motion.span>
             )}
-            
-            {/* Background hover fill effect */}
+
             <div className="absolute inset-0 bg-red-50 dark:bg-red-900/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
           </button>
         </div>

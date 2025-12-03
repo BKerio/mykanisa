@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-import 'package:pcea_church/screen/constant.dart';
+import 'package:pcea_church/components/constant.dart';
 import 'package:pcea_church/screen/welcome.dart';
 
 class SplashScreen extends StatefulWidget {

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 import 'package:pcea_church/screen/dashboard_factory.dart';
@@ -140,16 +141,32 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
               ),
 
               const SizedBox(height: 15),
-              const SizedBox(
-                width: 50,
-                height: 50,
-                child: CircularProgressIndicator(
-                  strokeWidth: 4,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A1F44)),
+              SizedBox(
+                width: double.infinity,
+                height: 90,
+                child: Center(
+                  child: SpinKitFadingCircle(
+                    size: 108,
+                    duration: const Duration(milliseconds: 3200),
+                    itemBuilder: (context, index) {
+                      final palette = [
+                        Colors.black,
+                        const Color(0xFF0A1F44),
+                        Colors.red,
+                        Colors.green,
+                      ];
+                      return DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: palette[index % palette.length],
+                          shape: BoxShape.circle,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 25),
+              SizedBox(height: 40),
               Text(
                 'Loading your dashboard, $username',
                 style: TextStyle(

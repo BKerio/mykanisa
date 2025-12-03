@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/components/responsive_layout.dart';
 import 'package:pcea_church/method/api.dart';
 import 'package:pcea_church/config/server.dart';
@@ -183,30 +184,55 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              onPressed: isLoading ? null : resetPassword,
-              child: isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      'Reset Password',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+          if (isLoading)
+            SizedBox(
+              width: double.infinity,
+              height: 70,
+              child: Center(
+                child: SpinKitFadingCircle(
+                  size: 108,
+                  duration: const Duration(milliseconds: 3200),
+                  itemBuilder: (context, index) {
+                    final palette = [
+                      Colors.black,
+                      Color(0xFF0A1F44),
+                      Colors.red,
+                      Colors.green,
+                    ];
+                    return DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: palette[index % palette.length],
+                        shape: BoxShape.circle,
                       ),
-                    ),
+                    );
+                  },
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: resetPassword,
+                child: const Text(
+                  "Enter a new password",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ),
-          ),
+          const SizedBox(height: 16),
         ],
       ),
     );

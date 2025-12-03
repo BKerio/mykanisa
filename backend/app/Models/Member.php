@@ -31,6 +31,7 @@ class Member extends Model
         'telephone',
         'region',
         'role',
+        'assigned_group_id',
         'is_active',
         'email_verified_at',
     ];
@@ -62,6 +63,36 @@ class Member extends Model
     {
         return $this->belongsToMany(Group::class, 'group_member')->withTimestamps();
     }
+
+    /**
+     * Get the assigned group for youth leaders
+     */
+    public function assignedGroup()
+    {
+        return $this->belongsTo(Group::class, 'assigned_group_id');
+    }
+
+    /**
+     * Check if member is part of a specific group
+     */
+    public function isMemberOfGroup($groupId)
+    {
+        // Check in the JSON groups field
+        if ($this->groups) {
+            try {
+                $groupIds = json_decode($this->groups, true);
+                if (is_array($groupIds) && in_array($groupId, $groupIds)) {
+                    return true;
+                }
+            } catch (\Exception $e) {
+                // Invalid JSON, continue to check pivot table
+            }
+        }
+        
+        // Also check the pivot table relationship
+        return $this->groups()->where('groups.id', $groupId)->exists();
+    }
+
     /**
      * Get all roles for this member
      */

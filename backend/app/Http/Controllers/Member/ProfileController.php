@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Member;
 
 use App\Http\Controllers\Controller;
 use App\Models\Member;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -43,6 +44,16 @@ class ProfileController extends Controller
         ]);
 
         $member->update($validated);
+        
+        // Also update the corresponding user's name if full_name was updated
+        // This ensures consistency across all related tables (members and users)
+        if (array_key_exists('full_name', $validated)) {
+            $user = User::where('email', $member->email)->first();
+            if ($user) {
+                $user->name = $validated['full_name'];
+                $user->save();
+            }
+        }
         
         return response()->json([
             'status' => 200,

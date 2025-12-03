@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pcea_church/config/server.dart';
+import 'package:pcea_church/method/api.dart';
 import 'package:pcea_church/screen/digital_card.dart';
 import 'package:pcea_church/screen/login.dart';
 import 'package:pcea_church/screen/profile.dart';
@@ -18,8 +20,51 @@ class _SettingsPageState extends State<SettingsPage> {
   bool darkMode = false;
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // Show toast message when logout starts
+    if (mounted) {
+      API.showSnack(
+        context,
+        'Logging out...',
+        success: true,
+      );
+    }
+    
+    try {
+      // Call backend logout endpoint to delete token on server
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token != null && token.isNotEmpty) {
+        try {
+          await API().postRequest(
+            url: Uri.parse('${Config.baseUrl}/members/logout'),
+            data: {},
+          );
+        } catch (e) {
+          // Continue with logout even if API call fails
+          debugPrint('Logout API call failed: $e');
+        }
+      }
+      
+      // Clear all local storage
+      await prefs.clear();
+    } catch (e) {
+      // If anything fails, still clear local storage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    }
+    
+    // Show success toast message
+    if (mounted) {
+      API.showSnack(
+        context,
+        'Logged out successfully',
+        success: true,
+      );
+      // Wait a moment for the toast to be visible before navigating
+      await Future.delayed(const Duration(milliseconds: 1000));
+    }
+    
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
@@ -29,89 +74,145 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _confirmLogout() {
-    showDialog(
+    const Color primaryColor = Color(0xFF0A1F44);
+
+    showGeneralDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: Colors.white,
-        elevation: 10,
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
+      barrierColor: Colors.black.withOpacity(0.35),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const SizedBox.shrink(),
+      transitionBuilder: (context, animation, _, __) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+        );
+
+        return ScaleTransition(
+          scale: curved,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 26),
+              padding: const EdgeInsets.fromLTRB(26, 22, 26, 18),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.94),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.5),
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    offset: const Offset(0, 6),
+                    blurRadius: 22,
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.logout_rounded,
-                color: Colors.black,
-                size: 26,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: primaryColor.withOpacity(0.08),
+                    ),
+                    child: const Icon(
+                      Icons.logout_rounded,
+                      color: primaryColor,
+                      size: 40,
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  const Text(
+                    'Logout',
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                      color: primaryColor,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  const Text(
+                    'Are you sure you want to log out?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                      height: 1.35,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+
+                  const SizedBox(height: 26),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text(
+                            'Stay',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(context, true);
+                            await _logout();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 6,
+                            shadowColor: primaryColor.withOpacity(0.25),
+                            backgroundColor: primaryColor,
+                          ),
+                          child: const Text(
+                            'Logout',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Logout of the app',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Colors.black87,
-              ),
-            ),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to log out?',
-          style: TextStyle(fontSize: 16, color: Colors.black54, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[700],
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
-          ElevatedButton.icon(
-            icon: const Icon(
-              Icons.check_circle_outline,
-              size: 18,
-              color: Colors.white,
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orangeAccent,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              elevation: 4,
-            ),
-            onPressed: () {
-              Navigator.pop(ctx, true);
-              _logout();
-            },
-            label: const Text(
-              'Logout',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

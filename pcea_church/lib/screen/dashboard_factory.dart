@@ -80,29 +80,29 @@ class DashboardFactory {
   static Color getRolePrimaryColor(String role) {
     switch (role.toLowerCase()) {
       case 'pastor':
-        return const Color(0xFF8B4513); // Saddle Brown
+        return const Color(0xFF0A1F44);
       case 'elder':
-        return const Color(0xFF2E7D32); // Dark Green
+        return const Color(0xFF0A1F44);
       case 'deacon':
-        return const Color(0xFF1976D2); // Blue
+        return const Color(0xFF0A1F44);
       case 'secretary':
-        return const Color(0xFF795548); // Brown
+        return const Color(0xFF0A1F44);
       case 'treasurer':
-        return const Color(0xFF388E3C); // Dark Green
+        return const Color(0xFF0A1F44);
       case 'chairman':
-        return const Color(0xFF1565C0); // Deep Blue
+        return const Color(0xFF0A1F44);
       case 'choir_leader':
       case 'choir leader':
-        return const Color(0xFF7B1FA2); // Purple
+        return const Color(0xFF0A1F44);
       case 'youth_leader':
       case 'youth leader':
-        return const Color(0xFFE91E63); // Pink
+        return const Color(0xFF0A1F44);
       case 'sunday_school_teacher':
       case 'sunday school teacher':
-        return const Color(0xFFE91E63); // Pink
+        return const Color(0xFF0A1F44);
       case 'member':
       default:
-        return const Color(0xFF35C2C1); // Teal
+        return const Color(0xFF0A1F44);
     }
   }
 
@@ -110,29 +110,29 @@ class DashboardFactory {
   static Color getRoleSecondaryColor(String role) {
     switch (role.toLowerCase()) {
       case 'pastor':
-        return const Color(0xFFCD853F); // Peru
+        return const Color(0xFF0A1F44);
       case 'elder':
-        return const Color(0xFF4CAF50); // Green
+        return const Color(0xFF0A1F44);
       case 'deacon':
-        return const Color(0xFF42A5F5); // Light Blue
+        return const Color(0xFF0A1F44);
       case 'secretary':
-        return const Color(0xFFA1887F); // Light Brown
+        return const Color(0xFF0A1F44);
       case 'treasurer':
-        return const Color(0xFF66BB6A); // Light Green
+        return const Color(0xFF0A1F44);
       case 'chairman':
-        return const Color(0xFF42A5F5); // Light Blue
+        return const Color(0xFF0A1F44);
       case 'choir_leader':
       case 'choir leader':
-        return const Color(0xFFBA68C8); // Light Purple
+        return const Color(0xFF0A1F44);
       case 'youth_leader':
       case 'youth leader':
-        return const Color(0xFFF06292); // Light Pink
+        return const Color(0xFF0A1F44);
       case 'sunday_school_teacher':
       case 'sunday school teacher':
-        return const Color(0xFFF8BBD9); // Light Pink
+        return const Color(0xFF0A1F44);
       case 'member':
       default:
-        return const Color(0xFF20BBA6); // Teal
+        return const Color(0xFF0A1F44);
     }
   }
 

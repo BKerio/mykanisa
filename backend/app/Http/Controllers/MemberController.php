@@ -295,6 +295,15 @@ class MemberController extends Controller
         $member->fill($validated);
         $member->save();
 
+        // Also update the corresponding user's name if full_name was updated
+        // This ensures consistency across all related tables
+        if (array_key_exists('full_name', $validated)) {
+            if ($user) {
+                $user->name = $validated['full_name'];
+                $user->save();
+            }
+        }
+
         return response()->json(['status' => 200, 'member' => $member, 'message' => 'Profile updated']);
     }
 

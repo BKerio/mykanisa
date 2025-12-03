@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
@@ -1553,9 +1554,28 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
       onRefresh: _loadMessageHistory,
       color: const Color(0xFF0A1F44),
       child: _isLoadingHistory
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A1F44)),
+          ? SizedBox(
+              width: double.infinity,
+              height: 70,
+              child: Center(
+                child: SpinKitFadingCircle(
+                  size: 50,
+                  duration: const Duration(milliseconds: 1200),
+                  itemBuilder: (context, index) {
+                    final palette = const [
+                      Color(0xFF0A1F44), // dark blue
+                      Colors.white,
+                      Colors.green,
+                      Colors.red,
+                    ];
+                    return DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: palette[index % palette.length],
+                        shape: BoxShape.circle,
+                      ),
+                    );
+                  },
+                ),
               ),
             )
           : _messageHistory.isEmpty
@@ -1683,7 +1703,7 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                   // Avatar with initials
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
+                    backgroundColor: const Color(0xFF0A1F44),
                     child: Text(
                       senderInitials,
                       style: const TextStyle(
@@ -1973,8 +1993,8 @@ class _ElderMessageFormScreenState extends State<ElderMessageFormScreen>
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                   color: isReadByRecipient
-                                      ? Colors.green.shade700
-                                      : Colors.orange.shade700,
+                                      ? Colors.green
+                                      : Colors.orange,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
