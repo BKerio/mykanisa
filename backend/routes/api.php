@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\CongregationsController as AdminCongregationsCont
 use App\Http\Controllers\Admin\RolesController as AdminRolesController;
 use App\Http\Controllers\Admin\PermissionsController as AdminPermissionsController;
 use App\Http\Controllers\Admin\SystemConfigController as AdminSystemConfigController;
+use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
 use App\Http\Controllers\ContributionsController;
 use App\Models\Member;
 use App\Models\Role;
@@ -146,6 +147,13 @@ Route::prefix('admin')->group(function(){
             Route::post('/bulk-update', [AdminSystemConfigController::class, 'bulkUpdate']);
             Route::post('/', [AdminSystemConfigController::class, 'store']);
             Route::delete('/{key}', [AdminSystemConfigController::class, 'destroy']);
+        });
+
+        // Attendance routes
+        Route::prefix('attendance')->group(function(){
+            Route::post('/mark', [AdminAttendanceController::class, 'markAttendance']);
+            Route::post('/mark-single', [AdminAttendanceController::class, 'markSingleAttendance']);
+            Route::get('/', [AdminAttendanceController::class, 'getAttendance']);
         });
 
         // Roles and Permissions routes (Admin only)

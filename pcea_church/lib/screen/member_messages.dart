@@ -869,11 +869,9 @@ class _MemberMessagesScreenState extends State<MemberMessagesScreen>
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Row(
+          mainAxisSize: MainAxisSize.min, // Center the row content
           children: [
-            const Text(
-              'Check for new Messages',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            const Text('Inbox', style: TextStyle(fontWeight: FontWeight.bold)),
             if (_unreadCount > 0) ...[
               const SizedBox(width: 8),
               Container(
@@ -894,11 +892,13 @@ class _MemberMessagesScreenState extends State<MemberMessagesScreen>
             ],
           ],
         ),
-        backgroundColor: Color.fromARGB(255, 241, 242, 243),
+        backgroundColor: const Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, size: 30),
+            icon: const Icon(Icons.refresh_rounded, size: 35),
             onPressed: _refreshing
                 ? null
                 : () {
@@ -915,14 +915,21 @@ class _MemberMessagesScreenState extends State<MemberMessagesScreen>
           controller: _tabController,
           indicatorColor: Colors.white,
           indicatorWeight: 3,
-          labelColor: Color(0xFF0A1F44),
-          unselectedLabelColor: Colors.teal,
+          labelColor: Colors.orange,
+          unselectedLabelColor: Colors.white,
           tabs: const [
-            Tab(icon: Icon(Icons.mark_email_unread_rounded), text: 'Received'),
-            Tab(icon: Icon(Icons.campaign_outlined), text: 'Sent'),
+            Tab(
+              icon: Icon(Icons.mark_email_unread_rounded, size: 35),
+              text: 'Received messages',
+            ),
+            Tab(
+              icon: Icon(Icons.campaign_outlined, size: 35),
+              text: 'Sent messages',
+            ),
           ],
         ),
       ),
+
       body: Stack(
         children: [
           TabBarView(
@@ -936,11 +943,10 @@ class _MemberMessagesScreenState extends State<MemberMessagesScreen>
           ),
           // Floating Elevated Button at bottom right
           Positioned(
-            bottom:
-                100, // Account for bottom navigation bar (72px height + 16px padding + 12px spacing)
+            bottom: 95, // Adjust position as needed
             right: 20,
-            child: ElevatedButton.icon(
-              onPressed: () {
+            child: GestureDetector(
+              onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -951,22 +957,30 @@ class _MemberMessagesScreenState extends State<MemberMessagesScreen>
                   _loadSentMessages();
                 });
               },
-              icon: const Icon(Icons.message, size: 20),
-              label: const Text(
-                'Message Elder',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A1F44),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
+              child: Container(
+                height: 68,
+                width: 68,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A1F44),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0A1F44).withOpacity(0.5),
+                      blurRadius: 16,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 5),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                elevation: 6,
-                shadowColor: const Color(0xFF0A1F44).withOpacity(0.4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
+                child: const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: Colors.white,
+                  size: 35,
                 ),
               ),
             ),
@@ -1521,9 +1535,26 @@ class _MemberMessagesScreenState extends State<MemberMessagesScreen>
       onRefresh: _refreshSentMessages,
       color: const Color(0xFF0A1F44),
       child: _isLoadingSent
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A1F44)),
+          ? Center(
+              child: SpinKitFadingCircle(
+                size: 64,
+                duration: const Duration(
+                  milliseconds: 1800,
+                ), // Adjusted duration
+                itemBuilder: (context, index) {
+                  final palette = [
+                    Color(0xFF0A1F44),
+                    Colors.red,
+                    Colors.blue,
+                    Colors.green,
+                  ];
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: palette[index % palette.length],
+                      shape: BoxShape.circle,
+                    ),
+                  );
+                },
               ),
             )
           : _sentMessages.isEmpty

@@ -135,19 +135,25 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        centerTitle: true,
+        backgroundColor: const Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.black87),
         title: const Text(
           'My Church Groups',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         actions: [
           IconButton(
             onPressed: _isLoading ? null : _loadData,
-            icon: const Icon(Icons.refresh, color: Colors.black87),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              size: 35,
+              color: Colors.white,
+            ),
             tooltip: 'Refresh',
           ),
         ],

@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import toast, { Toaster } from 'react-hot-toast';
-import { ChurchIcon, LayoutDashboard, LogOut, LucideUserCircle2, Users, MapPin, Building2, Church, ArrowRight, EuroIcon, Settings } from 'lucide-react';
+import { ChurchIcon, LayoutDashboard, LogOut, LucideUserCircle2, Users, MapPin, Building2, Church, ArrowRight, EuroIcon, Settings, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface UserProfile {
@@ -23,6 +23,7 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
   const sidebarNavLinks = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { name: 'Registered Members', icon: LucideUserCircle2, path: '/dashboard/members' },
+    { name: 'Digital Attendance', icon: QrCode, path: '/dashboard/attendance' },
     { name: 'Congregations', icon: ChurchIcon, path: '/dashboard/congregations' },
     { name: 'Contributions', icon: EuroIcon, path: '/dashboard/contributions' },
     { name: 'Church Groups', icon: Users, path: '/dashboard/groups' },

@@ -202,16 +202,17 @@ class _MembersScreenState extends State<MembersScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
         title: const Text(
           'Congregation Members',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        ),
+        // shape: const RoundedRectangleBorder(
+        //   borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        // ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+            icon: const Icon(Icons.refresh, color: Colors.white, size: 35),
             onPressed: _loadMembers,
             tooltip: 'Refresh',
           ),

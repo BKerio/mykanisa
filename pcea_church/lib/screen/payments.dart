@@ -875,7 +875,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         backgroundColor: const Color(0xFF0A1F44),
         foregroundColor: Colors.white,
         elevation: 2,
-        title: null, // Removed the title
+        title: Text("M-Pesa Giving"),
         centerTitle: true,
         actions: [
           if (_activePledges.isNotEmpty)

@@ -234,26 +234,46 @@ class _MemberYouthLeaderMessageScreenState
                           ),
                           child: Row(
                             children: [
-                              CircleAvatar(
-                                radius: 30,
-                                backgroundColor:
-                                    const Color(0xFF0A1F44).withOpacity(0.15),
-                                backgroundImage: _youthLeader!['profile_image'] !=
-                                        null
-                                    ? NetworkImage(
-                                        '${Config.baseUrl}/storage/${_youthLeader!['profile_image']}')
-                                    : null,
-                                child: _youthLeader!['profile_image'] == null
-                                    ? Text(
-                                        _getInitials(_youthLeader!['full_name']
-                                            ?.toString()),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF0A1F44),
-                                          fontSize: 20,
-                                        ),
-                                      )
-                                    : null,
+                              Builder(
+                                builder: (context) {
+                                  final raw =
+                                      (_youthLeader!['profile_image_url'] ??
+                                              _youthLeader!['profile_image'])
+                                          ?.toString()
+                                          .trim();
+                                  String? imageUrl;
+                                  if (raw != null && raw.isNotEmpty) {
+                                    if (raw.startsWith('http://') ||
+                                        raw.startsWith('https://')) {
+                                      imageUrl = raw;
+                                    } else {
+                                      final base =
+                                          Config.baseUrl.replaceAll('/api', '');
+                                      imageUrl =
+                                          raw.startsWith('/') ? '$base$raw' : '$base/$raw';
+                                    }
+                                  }
+
+                                  return CircleAvatar(
+                                    radius: 30,
+                                    backgroundColor:
+                                        const Color(0xFF0A1F44).withOpacity(0.15),
+                                    backgroundImage: imageUrl != null
+                                        ? NetworkImage(imageUrl)
+                                        : null,
+                                    child: imageUrl == null
+                                        ? Text(
+                                            _getInitials(_youthLeader!['full_name']
+                                                ?.toString()),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF0A1F44),
+                                              fontSize: 20,
+                                            ),
+                                          )
+                                        : null,
+                                  );
+                                },
                               ),
                               const SizedBox(width: 16),
                               Expanded(

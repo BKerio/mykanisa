@@ -583,7 +583,7 @@ class _MemberSendMessageScreenState extends State<MemberSendMessageScreen> {
                     ),
                     onPressed: _sendMessage,
                     child: const Text(
-                      "Login to your account",
+                      "Message your elder",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

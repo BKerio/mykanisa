@@ -115,17 +115,22 @@ class MemberDashboard extends BaseDashboard {
   @override
   List<BottomNavigationBarItem> getBottomNavItems() {
     return const [
-      BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
       BottomNavigationBarItem(
-        icon: Icon(Icons.campaign_rounded),
-        label: "Messages",
+        icon: Icon(Icons.grid_view_rounded),
+        label: "Home",
       ),
-      BottomNavigationBarItem(icon: Icon(Icons.group), label: "Dependents"),
       BottomNavigationBarItem(
-        icon: Icon(Icons.account_balance_wallet),
-        label: "Payments",
+        icon: Icon(Icons.chat_bubble_outline_rounded),
+        label: "Inbox",
       ),
-      BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Settings"),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.people_outline_rounded),
+        label: "Family",
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.settings_outlined),
+        label: "App Settings",
+      ),
     ];
   }
 
@@ -137,70 +142,4 @@ class MemberDashboard extends BaseDashboard {
 
   @override
   IconData getRoleIcon() => Icons.person;
-}
-
-// Placeholder screens for Member-specific functionality
-
-class NotificationsScreen extends StatelessWidget {
-  const NotificationsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        backgroundColor: const Color(0xFF35C2C1),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.notifications, size: 100, color: Colors.grey),
-            SizedBox(height: 20),
-            Text(
-              'Notifications',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'View church announcements and updates',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class MinistryInvolvementScreen extends StatelessWidget {
-  const MinistryInvolvementScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ministry Involvement'),
-        backgroundColor: const Color(0xFF35C2C1),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.church, size: 100, color: Colors.grey),
-            SizedBox(height: 20),
-            Text(
-              'Ministry Involvement',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Explore opportunities to get involved in church ministries',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

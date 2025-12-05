@@ -34,7 +34,10 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // Default to 3 tabs (Info, Leader, Messages)
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+    ); // Default to 3 tabs (Info, Leader, Messages)
     _loadGroupActivities();
   }
 
@@ -59,14 +62,14 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
         final response = jsonDecode(result.body) as Map<String, dynamic>;
         if (response['status'] == 200) {
           final isLeader = response['is_leader'] ?? false;
-          
+
           // Update tab controller based on whether user is leader
           final tabCount = isLeader ? 4 : 3;
           if (_tabController.length != tabCount) {
             _tabController.dispose();
             _tabController = TabController(length: tabCount, vsync: this);
           }
-          
+
           setState(() {
             _groupData = response;
             _isLeader = isLeader;
@@ -74,14 +77,18 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
           });
         } else {
           setState(() {
-            _error = response['message']?.toString() ?? 'Failed to load group activities';
+            _error =
+                response['message']?.toString() ??
+                'Failed to load group activities';
             _isLoading = false;
           });
         }
       } else {
         final response = jsonDecode(result.body) as Map<String, dynamic>;
         setState(() {
-          _error = response['message']?.toString() ?? 'Failed to load group activities';
+          _error =
+              response['message']?.toString() ??
+              'Failed to load group activities';
           _isLoading = false;
         });
       }
@@ -103,6 +110,26 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
       secondInitial = parts.last[0].toUpperCase();
     }
     return firstInitial + secondInitial;
+  }
+
+  /// Builds a full image URL for a leader, supporting both relative and absolute paths.
+  String? _getLeaderImageUrl(Map<String, dynamic> leader) {
+    final raw = (leader['profile_image_url'] ?? leader['profile_image'])
+        ?.toString()
+        .trim();
+    if (raw == null || raw.isEmpty) return null;
+
+    // If already an absolute URL, return as-is.
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
+    }
+
+    // Otherwise, treat as a relative path and prepend the base URL (without /api).
+    final base = Config.baseUrl.replaceAll('/api', '');
+    if (raw.startsWith('/')) {
+      return '$base$raw';
+    }
+    return '$base/$raw';
   }
 
   String _formatDate(String? dateString) {
@@ -135,62 +162,90 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.groupName,
-              style: const TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-              ),
-            ),
-            if (widget.groupDescription != null)
+        backgroundColor: const Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        centerTitle: true,
+        title: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Text(
-                widget.groupDescription!,
+                widget.groupName,
                 style: const TextStyle(
-                  color: Colors.black54,
-                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-          ],
+              if (widget.groupDescription != null)
+                Text(
+                  widget.groupDescription!,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
         ),
+
         bottom: _isLoading || _error != null
             ? null
             : TabBar(
                 controller: _tabController,
-                labelColor: const Color(0xFF0A1F44),
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: const Color(0xFF0A1F44),
+                indicatorColor: Colors.white,
+                indicatorWeight: 3,
+                labelColor: Colors.orange,
+                unselectedLabelColor: Colors.white70,
+
                 tabs: _isLeader
                     ? const [
-                        Tab(icon: Icon(Icons.info_outline), text: 'Info'),
-                        Tab(icon: Icon(Icons.people), text: 'Members'),
-                        Tab(icon: Icon(Icons.person), text: 'Leader'),
-                        Tab(icon: Icon(Icons.campaign), text: 'Messages'),
+                        Tab(
+                          icon: Icon(Icons.info_outline, size: 30),
+                          text: 'Group Info',
+                        ),
+                        Tab(
+                          icon: Icon(Icons.people, size: 30),
+                          text: 'Members',
+                        ),
+                        Tab(icon: Icon(Icons.person, size: 30), text: 'Leader'),
+                        Tab(
+                          icon: Icon(Icons.campaign, size: 30),
+                          text: 'Messages',
+                        ),
                       ]
                     : const [
-                        Tab(icon: Icon(Icons.info_outline), text: 'Info'),
-                        Tab(icon: Icon(Icons.person), text: 'Leader'),
-                        Tab(icon: Icon(Icons.campaign), text: 'Messages'),
+                        Tab(
+                          icon: Icon(Icons.info_outline, size: 30),
+                          text: 'Group Info',
+                        ),
+                        Tab(
+                          icon: Icon(Icons.person, size: 30),
+                          text: 'Group Leader',
+                        ),
+                        Tab(
+                          icon: Icon(Icons.campaign, size: 30),
+                          text: 'Messages',
+                        ),
                       ],
               ),
+
         actions: [
           IconButton(
             onPressed: _loadGroupActivities,
-            icon: const Icon(Icons.refresh, color: Colors.black87),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              size: 35,
+              color: Colors.white,
+            ),
             tooltip: 'Refresh',
           ),
         ],
       ),
+
       body: _isLoading
           ? Center(
               child: SpinKitFadingCircle(
@@ -213,49 +268,63 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
               ),
             )
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline,
-                            color: Colors.redAccent, size: 64),
-                        const SizedBox(height: 12),
-                        Text(_error!,
-                            style: const TextStyle(fontSize: 16),
-                            textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A1F44),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: _loadGroupActivities,
-                        ),
-                      ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: Color(0xFF0A1F44),
+                      size: 64,
                     ),
-                  ),
-                )
-              : TabBarView(
-                  controller: _tabController,
-                  children: _isLeader
-                      ? [
-                          _buildInfoTab(),
-                          _buildMembersTab(),
-                          _buildLeaderTab(),
-                          _buildMessagesTab(),
-                        ]
-                      : [
-                          _buildInfoTab(),
-                          _buildLeaderTab(),
-                          _buildMessagesTab(),
-                        ],
+                    const SizedBox(height: 12),
+                    const Text(
+                      'We couldn’t load details for this group right now.',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0A1F44),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'It may be that no information has been added yet, or there was a small connection issue.',
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.refresh, size: 35),
+                      label: const Text(
+                        'Try Again, Please',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0A1F44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _loadGroupActivities,
+                    ),
+                  ],
                 ),
+              ),
+            )
+          : TabBarView(
+              controller: _tabController,
+              children: _isLeader
+                  ? [
+                      _buildInfoTab(),
+                      _buildMembersTab(),
+                      _buildLeaderTab(),
+                      _buildMessagesTab(),
+                    ]
+                  : [_buildInfoTab(), _buildLeaderTab(), _buildMessagesTab()],
+            ),
     );
   }
 
@@ -271,38 +340,44 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
         children: [
           // Group Info Card
           Card(
-            elevation: 2,
+            elevation: 3,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF0A1F44).withOpacity(0.1),
-                    Colors.white,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.grey.shade200, width: 1),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
-                        radius: 30,
+                      Container(
+                        height: 64,
+                        width: 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A1F44).withOpacity(0.1),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
                         child: const Icon(
-                          Icons.groups,
+                          Icons.groups_rounded,
                           color: Color(0xFF0A1F44),
-                          size: 30,
+                          size: 34,
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 18),
+
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,11 +385,14 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                             Text(
                               group['name']?.toString() ?? widget.groupName,
                               style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
                                 color: Color(0xFF0A1F44),
+                                height: 1.2,
                               ),
                             ),
+                            const SizedBox(height: 4),
+
                             if (_isLeader)
                               Text(
                                 '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
@@ -328,15 +406,19 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                       ),
                     ],
                   ),
+
                   if (group['description'] != null &&
                       group['description'].toString().isNotEmpty) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
+                    Divider(color: Colors.grey.shade300, thickness: 1),
+                    const SizedBox(height: 14),
+
                     Text(
                       group['description'].toString(),
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 15,
                         color: Colors.grey.shade700,
-                        height: 1.5,
+                        height: 1.55,
                       ),
                     ),
                   ],
@@ -344,6 +426,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
               ),
             ),
           ),
+
           const SizedBox(height: 16),
 
           // Statistics - Only show member count to leaders
@@ -364,28 +447,31 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                         'Leader',
                         youthLeader != null ? 'Assigned' : 'None',
                         Icons.person,
-                        Colors.green,
+                        Color(0xFF0A1F44),
                       ),
                     ),
                   ],
                 )
               : _buildStatCard(
-                  'Leader',
+                  'Group Leader',
                   youthLeader != null ? 'Assigned' : 'None',
                   Icons.person,
-                  Colors.green,
+                  Color(0xFF0A1F44),
                 ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -403,10 +489,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
             const SizedBox(height: 4),
             Text(
               title,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ],
         ),
@@ -461,15 +544,21 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0A1F44),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const YouthGroupCommunicationScreen(),
+                        builder: (context) =>
+                            const YouthGroupCommunicationScreen(),
                       ),
-                    ).then((_) => _loadGroupActivities()); // Refresh after sending
+                    ).then(
+                      (_) => _loadGroupActivities(),
+                    ); // Refresh after sending
                   },
                 ),
             ],
@@ -492,7 +581,8 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                     backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
                     backgroundImage: member['profile_image'] != null
                         ? NetworkImage(
-                            '${Config.baseUrl}/storage/${member['profile_image']}')
+                            '${Config.baseUrl}/${member['profile_image']}',
+                          )
                         : null,
                     child: member['profile_image'] == null
                         ? Text(
@@ -506,9 +596,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                   ),
                   title: Text(
                     member['full_name']?.toString() ?? 'Unknown',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -529,20 +617,27 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                             member['role'].toString().replaceAll('_', ' '),
                             style: const TextStyle(fontSize: 10),
                           ),
-                          backgroundColor:
-                              const Color(0xFF0A1F44).withOpacity(0.1),
+                          backgroundColor: const Color(
+                            0xFF0A1F44,
+                          ).withOpacity(0.1),
                         ),
                       if (_isLeader)
                         IconButton(
-                          icon: const Icon(Icons.message, color: Color(0xFF0A1F44)),
+                          icon: const Icon(
+                            Icons.message,
+                            color: Color(0xFF0A1F44),
+                          ),
                           onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => YouthIndividualMessageScreen(
-                                  recipientId: member['id'] as int,
-                                  recipientName: member['full_name']?.toString() ?? 'Unknown',
-                                ),
+                                builder: (context) =>
+                                    YouthIndividualMessageScreen(
+                                      recipientId: member['id'] as int,
+                                      recipientName:
+                                          member['full_name']?.toString() ??
+                                          'Unknown',
+                                    ),
                               ),
                             );
                           },
@@ -569,8 +664,11 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.person_off_outlined,
-                  size: 64, color: Colors.grey.shade400),
+              Icon(
+                Icons.person_off_outlined,
+                size: 64,
+                color: Colors.grey.shade400,
+              ),
               const SizedBox(height: 16),
               Text(
                 'No Youth Leader Assigned',
@@ -598,86 +696,118 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
         children: [
           // Youth Leader Card
           Card(
-            elevation: 2,
+            elevation: 3,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF0A1F44).withOpacity(0.1),
-                    Colors.white,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.grey.shade200, width: 1),
               ),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
-                    backgroundImage: youthLeader['profile_image'] != null
-                        ? NetworkImage(
-                            '${Config.baseUrl}/storage/${youthLeader['profile_image']}')
-                        : null,
-                    child: youthLeader['profile_image'] == null
-                        ? Text(
-                            _getInitials(youthLeader['full_name']?.toString()),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0A1F44),
-                              fontSize: 32,
-                            ),
-                          )
-                        : null,
+                  Builder(
+                    builder: (context) {
+                      final imageUrl = _getLeaderImageUrl(youthLeader);
+                      return CircleAvatar(
+                        radius: 55,
+                        backgroundColor: const Color(
+                          0xFF0A1F44,
+                        ).withOpacity(0.1),
+                        backgroundImage: imageUrl != null
+                            ? NetworkImage(imageUrl)
+                            : null,
+                        child: imageUrl == null
+                            ? Text(
+                                _getInitials(
+                                  youthLeader['full_name']?.toString(),
+                                ),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0A1F44),
+                                  fontSize: 34,
+                                ),
+                              )
+                            : null,
+                      );
+                    },
                   ),
-                  const SizedBox(height: 16),
+
+                  const SizedBox(height: 18),
+
                   Text(
                     youthLeader['full_name']?.toString() ?? 'Unknown',
                     style: const TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                       color: Color(0xFF0A1F44),
                     ),
                   ),
-                  const SizedBox(height: 8),
+
+                  const SizedBox(height: 10),
+
                   Chip(
                     label: const Text('Youth Leader'),
-                    backgroundColor: const Color(0xFF0A1F44).withOpacity(0.1),
+                    backgroundColor: const Color(0xFF0A1F44).withOpacity(0.12),
                     labelStyle: const TextStyle(
                       color: Color(0xFF0A1F44),
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 2,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
+
                   if (youthLeader['email'] != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     ListTile(
-                      leading: const Icon(Icons.email, color: Color(0xFF0A1F44)),
-                      title: Text(youthLeader['email'].toString()),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.email_outlined,
+                        color: Color(0xFF0A1F44),
+                      ),
+                      title: Text(
+                        youthLeader['email'].toString(),
+                        style: const TextStyle(fontSize: 15),
+                      ),
                     ),
                   ],
-                  if (youthLeader['telephone'] != null) ...[
+
+                  if (youthLeader['telephone'] != null)
                     ListTile(
-                      leading: const Icon(Icons.phone, color: Color(0xFF0A1F44)),
-                      title: Text(youthLeader['telephone'].toString()),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.phone_outlined,
+                        color: Color(0xFF0A1F44),
+                      ),
+                      title: Text(
+                        youthLeader['telephone'].toString(),
+                        style: const TextStyle(fontSize: 15),
+                      ),
                     ),
-                  ],
-                  const SizedBox(height: 16),
+
+                  const SizedBox(height: 20),
+
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.message),
-                      label: const Text('Send Message'),
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: const Text('Message Youth Leader'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0A1F44),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       onPressed: () {
@@ -708,7 +838,11 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.campaign_outlined, size: 64, color: Colors.grey.shade400),
+            Icon(
+              Icons.campaign_outlined,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 16),
             Text(
               'No Messages Yet',
@@ -733,8 +867,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
       padding: const EdgeInsets.all(16),
       itemCount: announcements.length,
       itemBuilder: (context, index) {
-        final announcement =
-            announcements[index] as Map<String, dynamic>;
+        final announcement = announcements[index] as Map<String, dynamic>;
         final sender = announcement['sender'] as Map<String, dynamic>?;
 
         return Card(
@@ -751,10 +884,13 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                 Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: const Color(0xFF0A1F44).withOpacity(0.15),
+                      backgroundColor: const Color(
+                        0xFF0A1F44,
+                      ).withOpacity(0.15),
                       backgroundImage: sender?['profile_image'] != null
                           ? NetworkImage(
-                              '${Config.baseUrl}/storage/${sender!['profile_image']}')
+                              '${Config.baseUrl}/storage/${sender!['profile_image']}',
+                            )
                           : null,
                       child: sender?['profile_image'] == null
                           ? Text(
@@ -773,9 +909,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                         children: [
                           Text(
                             sender?['full_name']?.toString() ?? 'Unknown',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text(
                             _formatDate(announcement['created_at']?.toString()),
@@ -815,4 +949,3 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
     );
   }
 }
-

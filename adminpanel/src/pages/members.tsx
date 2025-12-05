@@ -309,7 +309,7 @@ const MembersPage = () => {
         
         // Verify member is part of selected group
         const selectedGroup = groups.find((g: any) => g.id === selectedGroupId);
-        const memberGroupNames = member.group_names || [];
+        //const memberGroupNames = member.group_names || [];
         
         if (!selectedGroup || !memberGroupNames.includes(selectedGroup.name)) {
           Swal.fire({ 

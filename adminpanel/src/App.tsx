@@ -13,6 +13,7 @@ import RegionsPage from '@/pages/regions';
 import PresbyteriesPage from '@/pages/presbyteries';
 import ParishesPage from '@/pages/parishes';
 import SystemConfigPage from '@/pages/system-config';
+import AttendancePage from '@/pages/attendance';
 
 
 
@@ -42,6 +43,7 @@ function App() {
               <Route path="presbyteries" element={<PresbyteriesPage />} />
               <Route path="parishes" element={<ParishesPage />} />
               <Route path="system-config" element={<SystemConfigPage />} />
+              <Route path="attendance" element={<AttendancePage />} />
             </Route>
 
             <Route path="/" element={<Navigate to="/login" replace />} />

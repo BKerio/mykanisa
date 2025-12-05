@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pcea_church/screen/base_dashboard.dart';
+import 'package:pcea_church/screen/create_minutes.dart';
 import 'package:pcea_church/screen/member_messages.dart';
 import 'package:pcea_church/screen/members.dart';
 import 'package:pcea_church/screen/view_events.dart';
@@ -35,7 +36,12 @@ class SecretaryDashboard extends BaseDashboard {
         title: 'Minutes',
         color: Colors.teal,
         subtitle: 'Meeting minutes',
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => MinutesPage()),
+          );
+        },
       ),
       DashboardCard(
         icon: Icons.campaign_rounded,

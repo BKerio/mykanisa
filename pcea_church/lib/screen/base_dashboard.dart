@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/components/settings.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
@@ -492,7 +493,7 @@ class BaseDashboardState extends State<BaseDashboard> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            backgroundColor: const Color(0xFF0A1F44),
+                            backgroundColor: Colors.teal,
                             foregroundColor: Colors.white,
                           ),
                           child: const Text(
@@ -553,7 +554,32 @@ class BaseDashboardState extends State<BaseDashboard> {
 
   Widget _buildBody() {
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: SizedBox(
+          width: double.infinity,
+          height: 90,
+          child: Center(
+            child: SpinKitFadingCircle(
+              size: 108,
+              duration: const Duration(milliseconds: 3200),
+              itemBuilder: (context, index) {
+                final palette = [
+                  Colors.black,
+                  const Color(0xFF0A1F44),
+                  Colors.red,
+                  Colors.green,
+                ];
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: palette[index % palette.length],
+                    shape: BoxShape.circle,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
     }
 
     switch (_selectedIndex) {
@@ -876,16 +902,34 @@ class BaseDashboardState extends State<BaseDashboard> {
                       ),
                     ),
                   if (!isInteractive)
-                    const Positioned(
+                    Positioned(
                       right: 6,
                       top: 6,
                       child: SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Color(0xFF0A1F44),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 90,
+                          child: Center(
+                            child: SpinKitFadingCircle(
+                              size: 108,
+                              duration: const Duration(milliseconds: 3200),
+                              itemBuilder: (context, index) {
+                                final palette = const [
+                                  Colors.black,
+                                  const Color(0xFF0A1F44),
+                                  Colors.red,
+                                  Colors.green,
+                                ];
+                                return DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: palette[index % palette.length],
+                                    shape: BoxShape.circle,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
