@@ -32,6 +32,7 @@ interface AuditLogDto {
         email: string;
         member?: {
             full_name: string;
+            e_kanisa_number: string;
         }
     };
 }
@@ -189,7 +190,11 @@ const AuditLogsPage = () => {
                                                     <span className="text-sm font-bold text-slate-900">
                                                         {log.user?.member?.full_name || log.user?.name || "System"}
                                                     </span>
-                                                    <span className="text-[10px] text-slate-500">{log.user?.email}</span>
+                                                    <span className="text-[10px] text-slate-500">
+                                                        {log.user?.member?.e_kanisa_number
+                                                            ? `#${log.user.member.e_kanisa_number}`
+                                                            : log.user?.email}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </td>

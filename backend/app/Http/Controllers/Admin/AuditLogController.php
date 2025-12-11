@@ -6,18 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+
 class AuditLogController extends Controller
 {
     public function index(Request $request)
     {
-        $query = AuditLog::with('user.member')->orderBy('created_at', 'desc');
+        // Eager load member only if user is a User model
+        $query = AuditLog::with(['user' => function (MorphTo $morphTo) {
+            $morphTo->morphWith([
+                \App\Models\User::class => ['member'],
+            ]);
+        }])->orderBy('created_at', 'desc');
 
         if ($request->has('search') && !empty($request->search)) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('description', 'like', "%{$search}%")
                   ->orWhere('action', 'like', "%{$search}%")
-                  ->orWhereHas('user', function ($uq) use ($search) {
+                  ->orWhereHasMorph('user', ['App\Models\User', 'App\Models\Admin'], function ($uq) use ($search) {
                       $uq->where('name', 'like', "%{$search}%")
                          ->orWhere('email', 'like', "%{$search}%");
                   });

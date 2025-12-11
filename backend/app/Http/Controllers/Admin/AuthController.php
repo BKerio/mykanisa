@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -35,6 +36,9 @@ class AuthController extends Controller
         }
 
         $token = $admin->createToken('admin')->plainTextToken;
+        
+        AuditService::log('Login', 'Admin Logged In', $admin, null, $admin);
+
         return response()->json([
             'token' => $token,
             'admin' => [

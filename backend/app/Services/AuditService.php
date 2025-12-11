@@ -15,15 +15,17 @@ class AuditService
      * @param string $description Human readable description
      * @param mixed $model The related model (optional)
      * @param array $details Extra details (optional)
+     * @param mixed $actor Optional actor override (default: Auth::user())
      * @return void
      */
-    public static function log($action, $description, $model = null, $details = null)
+    public static function log($action, $description, $model = null, $details = null, $actor = null)
     {
         try {
-            $user = Auth::user(); // Might be Sanctum auth
+            $user = $actor ?: Auth::user(); 
             
             AuditLog::create([
                 'user_id' => $user ? $user->id : null,
+                'user_type' => $user ? get_class($user) : null,
                 'action' => $action,
                 'description' => substr($description, 0, 65000), // Safety clip
                 'model_type' => $model ? get_class($model) : null,

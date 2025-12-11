@@ -11,6 +11,7 @@ class AuditLog extends Model
 
     protected $fillable = [
         'user_id',
+        'user_type',
         'action',
         'model_type',
         'model_id',
@@ -28,7 +29,7 @@ class AuditLog extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->morphTo();
     }
     
     // Helper to get formatted date

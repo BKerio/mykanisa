@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Mail\ResetCodeMail;
 use App\Services\SmsService;
+use App\Services\AuditService;
 
 class AuthController extends Controller
 {
@@ -60,6 +61,8 @@ class AuthController extends Controller
 
             $member = Member::where('email', $user->email)->first();
             $user->e_kanisa_number = $member ? $member->e_kanisa_number : null;
+
+            AuditService::log('Login', 'User Logged In', $user, null, $user);
 
             return response()->json([
                 'status' => 200,
@@ -297,6 +300,7 @@ class AuthController extends Controller
         DB::table('password_resets')->where('email', $R->email)->delete();
 
         Log::info('Password reset successfully for email: ' . $R->email);
+        AuditService::log('Update', 'User Reset Password', $user, null, $user);
         return response()->json(['status' => 200, 'message' => 'Password reset successful']);
     }
 }
