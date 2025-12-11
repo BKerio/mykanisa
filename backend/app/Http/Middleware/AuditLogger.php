@@ -110,7 +110,7 @@ class AuditLogger
         }
         if (str_contains($path, 'members')) {
             if (str_contains($path, 'dependents')) return "$userName managed Dependents";
-            if ($method === 'POST') return "$userName registered a new Member";
+            if ($method === 'POST') return "$userName updated their Member profile";
             if (in_array($method, ['PUT', 'PATCH'])) return "$userName updated Member details";
         }
 
