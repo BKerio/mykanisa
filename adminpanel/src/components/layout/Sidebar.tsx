@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import toast, { Toaster } from 'react-hot-toast';
-import { ChurchIcon, LayoutDashboard, LogOut, LucideUserCircle2, Users, MapPin, Building2, Church, ArrowRight, EuroIcon, Settings, QrCode } from 'lucide-react';
+import { ChurchIcon, LayoutDashboard, LogOut, LucideUserCircle2, Users, MapPin, Building2, Church, ArrowRight, EuroIcon, Settings, QrCode, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface UserProfile {
@@ -31,6 +31,7 @@ const Sidebar = ({ sidebarOpen, isMobile, onLogout, onCloseMobile }: SidebarProp
     { name: 'Presbyteries', icon: Building2, path: '/dashboard/presbyteries' },
     { name: 'Parishes', icon: Church, path: '/dashboard/parishes' },
     { name: 'System Configurations', icon: Settings, path: '/dashboard/system-config' },
+    { name: 'System Logs', icon: Activity, path: '/dashboard/audit-logs' },
   ];
 
   const handleLogout = async () => {

@@ -14,6 +14,7 @@ import PresbyteriesPage from '@/pages/presbyteries';
 import ParishesPage from '@/pages/parishes';
 import SystemConfigPage from '@/pages/system-config';
 import AttendancePage from '@/pages/attendance';
+import AuditLogsPage from '@/pages/audit_logs';
 
 
 
@@ -23,7 +24,7 @@ function App() {
       <Router>
         <div className='min-h-screen bg-white dark:bg-gray-900'>
           <Routes>
-            
+
             <Route path="/login" element={<Login />} />
 
             <Route
@@ -36,7 +37,7 @@ function App() {
             >
               <Route index element={<Dashboard />} />
               <Route path="members" element={<MembersPage />} />
-              <Route path="congregations" element={ <CongregationsPage />} />
+              <Route path="congregations" element={<CongregationsPage />} />
               <Route path="contributions" element={<ContributionsPage />} />
               <Route path="groups" element={<GroupsPage />} />
               <Route path="regions" element={<RegionsPage />} />
@@ -44,13 +45,14 @@ function App() {
               <Route path="parishes" element={<ParishesPage />} />
               <Route path="system-config" element={<SystemConfigPage />} />
               <Route path="attendance" element={<AttendancePage />} />
+              <Route path="audit-logs" element={<AuditLogsPage />} />
             </Route>
 
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
 
           </Routes>
-         
+
         </div>
       </Router>
     </ThemeProvider>

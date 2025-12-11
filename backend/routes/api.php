@@ -363,6 +363,11 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::post('/minutes/tasks/{id}/status', [\App\Http\Controllers\MinutesController::class, 'updateActionStatus']);
 });
 
+// Admin Routes
+Route::middleware(['auth:sanctum'])->prefix('admin')->group(function() {
+    Route::get('/audit-logs', [\App\Http\Controllers\Admin\AuditLogController::class, 'index']);
+});
+
 // Treasurer routes
 Route::middleware(['auth:sanctum', 'role:treasurer'])->group(function(){
     Route::prefix('treasurer')->group(function(){
