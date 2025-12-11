@@ -15,6 +15,7 @@ class MinuteActionItem extends Model
         'responsible_member_id',
         'due_date',
         'status',
+        'status_reason'
     ];
 
     protected $casts = [

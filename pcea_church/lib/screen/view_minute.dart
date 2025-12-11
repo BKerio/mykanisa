@@ -7,6 +7,7 @@ import 'package:pcea_church/method/api.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'create_minutes.dart';
 
 class ViewMinutePage extends StatefulWidget {
@@ -26,11 +27,20 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _minute;
+  String? _currentUserEmail;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _loadMinute();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _currentUserEmail = prefs.getString('email');
+    });
   }
 
   Future<void> _loadMinute() async {
@@ -729,52 +739,148 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
     return Column(
       children: actionItems.map<Widget>((item) {
         final responsible = item['responsible_member']?['name'] ?? 'Unassigned';
+        final responsibleEmail = item['responsible_member']?['email'];
         final dueDate = item['due_date'] != null
             ? DateFormat.yMMMd().format(DateTime.parse(item['due_date']))
             : 'No deadline';
         final status = item['status'] ?? 'Pending';
+        final reason = item['status_reason'];
+
+        final isMyTask = _currentUserEmail != null && 
+                         responsibleEmail == _currentUserEmail;
 
         return Card(
           margin: EdgeInsets.only(bottom: 8),
-          child: Padding(
-            padding: EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item['description'] ?? 'No description',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.person, size: 14, color: Colors.grey),
-                    SizedBox(width: 4),
-                    Text(responsible, style: TextStyle(fontSize: 12)),
-                    SizedBox(width: 16),
-                    Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                    SizedBox(width: 4),
-                    Text(dueDate, style: TextStyle(fontSize: 12)),
-                    SizedBox(width: 16),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(status),
-                        borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: isMyTask ? () => _updateActionStatus(item['id'], status, reason) : null,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item['description'] ?? 'No description',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      child: Text(
-                        status,
-                        style: TextStyle(color: Colors.white, fontSize: 11),
+                      if (isMyTask)
+                        Icon(Icons.edit, size: 16, color: _brand),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.person, size: 14, color: Colors.grey),
+                      SizedBox(width: 4),
+                      Text(responsible, style: TextStyle(fontSize: 12)),
+                      SizedBox(width: 16),
+                      Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                      SizedBox(width: 4),
+                      Text(dueDate, style: TextStyle(fontSize: 12)),
+                      SizedBox(width: 16),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(status),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(color: Colors.white, fontSize: 11),
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                  if (reason != null && reason.toString().isNotEmpty) ...[
+                     SizedBox(height: 4),
+                     Text('Update: $reason', style: TextStyle(fontSize: 11, color: Colors.blueGrey)),
                   ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
       }).toList(),
     );
+  }
+
+  Future<void> _updateActionStatus(int id, String currentStatus, dynamic currentReason) async {
+    String selectedStatus = ['Pending', 'In progress', 'Done'].contains(currentStatus) 
+        ? currentStatus 
+        : 'Pending';
+    String reasonText = currentReason?.toString() ?? '';
+    
+    // Check if it was "Cannot Manage" (prefix logic)
+    if (reasonText.startsWith('[Cannot Manage] ')) {
+        selectedStatus = 'Cannot Manage';
+        reasonText = reasonText.replaceAll('[Cannot Manage] ', '');
+    }
+
+    final reasonController = TextEditingController(text: reasonText);
+
+    final result = await showDialog<Map<String, String>>(
+       context: context,
+       builder: (context) => StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+              title: Text('Update Task Status'),
+              content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                      DropdownButtonFormField<String>(
+                          value: selectedStatus,
+                          items: ['Pending', 'In progress', 'Done', 'Cannot Manage']
+                            .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                            .toList(),
+                          onChanged: (v) => setState(() => selectedStatus = v!),
+                          decoration: InputDecoration(labelText: 'Status'),
+                      ),
+                      SizedBox(height: 10),
+                      TextField(
+                          controller: reasonController,
+                          decoration: InputDecoration(labelText: 'Reason / Comment', border: OutlineInputBorder()),
+                          maxLines: 2,
+                      ),
+                  ],
+              ),
+              actions: [
+                  TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+                  ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white),
+                      onPressed: () => Navigator.pop(context, {
+                          'status': selectedStatus, 
+                          'reason': reasonController.text
+                      }),
+                      child: Text('Update'),
+                  ),
+              ],
+          ),
+       ),
+    );
+
+    if (result != null) {
+        setState(() => _loading = true);
+        try {
+            final uri = Uri.parse('${Config.baseUrl}/minutes/tasks/$id/status');
+            final response = await API().postRequest(url: uri, data: {
+                'status': result['status'],
+                'status_reason': result['reason'],
+            });
+            
+            if (response.statusCode >= 200 && response.statusCode < 300) {
+                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated')));
+                 _loadMinute(); 
+            } else {
+                 throw Exception('Failed to update status');
+            }
+        } catch(e) {
+            setState(() => _loading = false);
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        }
+    }
   }
 
   Widget _buildNotes() {

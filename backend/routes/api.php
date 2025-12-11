@@ -360,6 +360,7 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::post('/minutes', [\App\Http\Controllers\MinutesController::class, 'store']);
     Route::get('/minutes/mine', [\App\Http\Controllers\MinutesController::class, 'mine']);
     Route::get('/minutes/{id}', [\App\Http\Controllers\MinutesController::class, 'show']);
+    Route::post('/minutes/tasks/{id}/status', [\App\Http\Controllers\MinutesController::class, 'updateActionStatus']);
 });
 
 // Treasurer routes
