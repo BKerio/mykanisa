@@ -797,6 +797,100 @@ ${actions.isEmpty ? "(none)" : actions}
     });
   }
 
+  bool _isSubmitting = false;
+
+  Future<void> _submitMinutes() async {
+    // Validate required fields
+    if (_titleController.text.trim().isEmpty) {
+      _showSnack('Please enter a meeting title');
+      return;
+    }
+
+    if (_agendaItems.isEmpty) {
+      _showSnack('Please add at least one agenda item');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // Prepare attendees data
+      final attendeesData = _attendees.map((attendee) {
+        return {
+          'member_id': int.tryParse(attendee.id ?? '') ?? 0,
+          'status': attendee.status,
+        };
+      }).where((a) => a['member_id'] != 0).toList();
+
+      // Prepare agenda items data
+      final agendaItemsData = _agendaItems.asMap().entries.map((entry) {
+        return {
+          'title': entry.value.title,
+          'notes': entry.value.notes,
+          'order': entry.key,
+          'attachments': entry.value.attachments,
+        };
+      }).toList();
+
+      // Prepare action items data
+      final actionItemsData = _actionItems.map((item) {
+        return {
+          'description': item.description,
+          'responsible_member_id': item.responsible != null 
+              ? int.tryParse(item.responsible!) 
+              : null,
+          'due_date': item.dueDate?.toIso8601String().split('T')[0],
+          'status': item.status,
+        };
+      }).toList();
+
+      // Prepare the complete payload
+      final payload = {
+        'title': _titleController.text.trim(),
+        'meeting_date': DateFormat('yyyy-MM-dd').format(_meetingDate),
+        'meeting_time': _meetingTime.format(context),
+        'meeting_type': _meetingType,
+        'location': _locationController.text.trim(),
+        'is_online': _isOnline,
+        'online_link': _onlineLinkController.text.trim(),
+        'notes': _richNotesController.text.trim(),
+        'summary': _summary,
+        'attendees': attendeesData,
+        'agenda_items': agendaItemsData,
+        'action_items': actionItemsData,
+      };
+
+      final uri = Uri.parse('${Config.baseUrl}/secretary/minutes');
+      final response = await API().postRequest(url: uri, data: payload);
+
+      final body = jsonDecode(response.body);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        if (mounted) {
+          API.showSnack(context, 'Minutes saved successfully!', success: true);
+          Navigator.pop(context);
+        }
+      } else {
+        final message = body['message'] ?? 'Failed to save minutes';
+        if (mounted) {
+          API.showSnack(context, message, success: false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        API.showSnack(
+          context,
+          'Error saving minutes: ${e.toString()}',
+          success: false,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredAttendees = _filteredAttendees;
@@ -819,7 +913,8 @@ ${actions.isEmpty ? "(none)" : actions}
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
-            onPressed: () => _showSnack('Saved locally'),
+            onPressed: _isSubmitting ? null : _submitMinutes,
+            tooltip: 'Save Minutes',
           ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
@@ -2232,12 +2327,38 @@ ${actions.isEmpty ? "(none)" : actions}
       children: [
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: () => _showSnack('Exported to PDF'),
-            icon: Icon(Icons.picture_as_pdf),
-            label: Text('Export PDF'),
+            onPressed: () => _generateSummary(),
+            icon: const Icon(Icons.summarize),
+            label: const Text('Generate Summary'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
           ),
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
+        Expanded(
+          flex: 2,
+          child: ElevatedButton.icon(
+            onPressed: _isSubmitting ? null : _submitMinutes,
+            icon: _isSubmitting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.cloud_upload),
+            label: Text(_isSubmitting ? 'Saving...' : 'Save Minutes'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0A1F44),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              elevation: 2,
+            ),
+          ),
+        ),
       ],
     );
   }

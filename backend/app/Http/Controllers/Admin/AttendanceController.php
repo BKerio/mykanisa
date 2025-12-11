@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Models\Attendance;
 use App\Http\Controllers\Controller;
 use App\Models\Member;
 use App\Services\SmsService;
@@ -61,16 +62,23 @@ class AttendanceController extends Controller
                     continue;
                 }
 
-                // Store attendance record
-                $attendanceRecords[] = [
-                    'member_id' => $member->id,
-                    'e_kanisa_number' => $member->e_kanisa_number,
-                    'full_name' => $member->full_name,
-                    'congregation' => $member->congregation,
-                    'event_type' => $eventType,
-                    'event_date' => $eventDate,
-                    'scanned_at' => now(),
-                ];
+                // Store attendance record - Check for duplicates first
+                $attendance = Attendance::firstOrCreate(
+                    [
+                        'member_id' => $member->id,
+                        'event_date' => $eventDate,
+                        'event_type' => $eventType,
+                    ],
+                    [
+                        'e_kanisa_number' => $member->e_kanisa_number,
+                        'full_name' => $member->full_name,
+                        'congregation' => $member->congregation,
+                        'scanned_at' => now(),
+                    ]
+                );
+
+                // Only add to result list if it was recently created or we want to show it regardless
+                $attendanceRecords[] = $attendance;
 
                 // Send SMS confirmation to member
                 $phoneNumber = $memberData['phone'] ?? $member->telephone;
@@ -104,11 +112,10 @@ class AttendanceController extends Controller
                 }
             }
 
-            // Log attendance (you can replace this with database storage)
-            Log::info('Attendance marked', [
+            // Log attendance
+            Log::info('Attendance marked and saved', [
                 'user_id' => $user?->id,
                 'count' => count($attendanceRecords),
-                'records' => $attendanceRecords,
                 'sms_results' => $smsResults,
             ]);
 
@@ -174,9 +181,27 @@ class AttendanceController extends Controller
             $eventDate = $request->input('event_date', now()->toDateString());
             $phoneNumber = $request->input('phone') ?: $member->telephone;
 
-            // Send SMS confirmation
+            // Save attendance record - Check for duplicates
+            // We use firstOrCreate to ensure we never duplicate the record
+            $attendance = Attendance::firstOrCreate(
+                [
+                    'member_id' => $member->id,
+                    'event_date' => $eventDate,
+                    'event_type' => $eventType,
+                ],
+                [
+                    'e_kanisa_number' => $member->e_kanisa_number,
+                    'full_name' => $member->full_name,
+                    'congregation' => $member->congregation,
+                    'scanned_at' => now(),
+                ]
+            );
+            
+            $wasRecentlyCreated = $attendance->wasRecentlyCreated;
             $smsSent = false;
-            if ($phoneNumber) {
+
+            // Only send SMS if the attendance record is NEW
+            if ($wasRecentlyCreated && $phoneNumber) {
                 $smsService = new SmsService();
                 $smsMessage = $this->generateAttendanceSmsMessage($member, $eventType, $eventDate);
                 $smsSent = $smsService->sendSms($phoneNumber, $smsMessage);
@@ -192,23 +217,30 @@ class AttendanceController extends Controller
                         'phone' => $phoneNumber,
                     ]);
                 }
+            } else if (!$wasRecentlyCreated) {
+                 Log::info('Duplicate attendance scan skipped SMS', [
+                    'member_id' => $member->id,
+                    'event_type' => $eventType
+                ]);
             }
 
-            // Log attendance
+            // Log attendance result
             Log::info('Single attendance marked', [
                 'member_id' => $member->id,
-                'e_kanisa_number' => $member->e_kanisa_number,
+                'attendance_id' => $attendance->id,
+                'is_new' => $wasRecentlyCreated,
                 'sms_sent' => $smsSent,
             ]);
 
             return response()->json([
                 'status' => 200,
-                'message' => 'Attendance marked successfully',
+                'message' => $wasRecentlyCreated ? 'Attendance marked successfully' : 'Member already marked for this event',
                 'data' => [
                     'member_id' => $member->id,
                     'full_name' => $member->full_name,
                     'e_kanisa_number' => $member->e_kanisa_number,
                     'sms_sent' => $smsSent,
+                    'was_recently_created' => $wasRecentlyCreated,
                 ],
             ]);
 
@@ -229,14 +261,36 @@ class AttendanceController extends Controller
     public function getAttendance(Request $request)
     {
         try {
-            $eventDate = $request->input('event_date', now()->toDateString());
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
             $eventType = $request->input('event_type');
 
-            // This is a placeholder - implement based on your attendance storage
+            $query = Attendance::query();
+
+            if ($startDate) {
+                $query->whereDate('event_date', '>=', $startDate);
+            }
+
+            if ($endDate) {
+                $query->whereDate('event_date', '<=', $endDate);
+            }
+            
+            // If no date range provided, default to today? Or show all?
+            // Let's default to today if no filters at all, for performance, unless specific flag
+            if (!$startDate && !$endDate && !$eventType) {
+                 $query->whereDate('event_date', now()->toDateString());
+            }
+
+            $records = $query->when($eventType, function($q) use ($eventType) {
+                    return $q->where('event_type', $eventType);
+                })
+                ->orderBy('scanned_at', 'desc')
+                ->get();
+
             return response()->json([
                 'status' => 200,
                 'message' => 'Attendance records retrieved',
-                'data' => [],
+                'data' => $records,
             ]);
 
         } catch (\Exception $e) {
@@ -251,26 +305,95 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Generate SMS message for attendance confirmation
+     * Generate SMS message for attendance confirmation based on occasion
      */
     protected function generateAttendanceSmsMessage(Member $member, string $eventType, string $eventDate): string
     {
         $date = date('l, F j, Y', strtotime($eventDate));
         $time = date('g:i A');
+        $eventTypeLower = strtolower(trim($eventType));
         
-        $message = "ATTENDANCE CONFIRMED\n\n";
-        $message .= "Dear {$member->full_name},\n\n";
-        $message .= "Your attendance has been successfully marked for:\n";
-        $message .= "Event: {$eventType}\n";
-        $message .= "Date: {$date}\n";
-        $message .= "Time: {$time}\n\n";
-        
-        if ($member->congregation) {
-            $message .= "Congregation: {$member->congregation}\n";
+        // Customize message based on occasion type
+        if (strpos($eventTypeLower, 'holy communion') !== false) {
+            // Holy Communion message
+            $message = "HOLY COMMUNION ATTENDANCE\n\n";
+            $message .= "Dear {$member->full_name},\n\n";
+            $message .= "Your attendance for Holy Communion has been confirmed.\n\n";
+            $message .= "Date: {$date}\n";
+            $message .= "Time: {$time}\n\n";
+            
+            if ($member->congregation) {
+                $message .= "Congregation: {$member->congregation}\n\n";
+            }
+            
+            $message .= "Thank you for participating in this sacred sacrament. May the body and blood of our Lord Jesus Christ strengthen your faith.\n\n";
+            $message .= "God bless you!\n\n";
+            $message .= "PCEA Church";
+            
+        } elseif (strpos($eventTypeLower, 'sunday service') !== false) {
+            // Sunday Service message
+            $message = "SUNDAY SERVICE ATTENDANCE\n\n";
+            $message .= "Dear {$member->full_name},\n\n";
+            $message .= "Your attendance for Sunday Service has been confirmed.\n\n";
+            $message .= "Date: {$date}\n";
+            $message .= "Time: {$time}\n\n";
+            
+            if ($member->congregation) {
+                $message .= "Congregation: {$member->congregation}\n\n";
+            }
+            
+            $message .= "Thank you for joining us in worship. May God's word enrich your life this week.\n\n";
+            $message .= "Blessings!\n\n";
+            $message .= "PCEA Church";
+            
+        } elseif (strpos($eventTypeLower, 'weekly meeting') !== false) {
+            // Weekly Meeting message
+            $message = "WEEKLY MEETING ATTENDANCE\n\n";
+            $message .= "Dear {$member->full_name},\n\n";
+            $message .= "Your attendance for Weekly Meeting has been confirmed.\n\n";
+            $message .= "Date: {$date}\n";
+            $message .= "Time: {$time}\n\n";
+            
+            if ($member->congregation) {
+                $message .= "Congregation: {$member->congregation}\n\n";
+            }
+            
+            $message .= "Thank you for your participation. Your presence strengthens our church community.\n\n";
+            $message .= "God bless you!\n\n";
+            $message .= "PCEA Church";
+            
+        } elseif (strpos($eventTypeLower, 'annual general meeting') !== false || strpos($eventTypeLower, 'agm') !== false) {
+            // Annual General Meeting message
+            $message = "ANNUAL GENERAL MEETING\n\n";
+            $message .= "Dear {$member->full_name},\n\n";
+            $message .= "Your attendance for the Annual General Meeting has been confirmed.\n\n";
+            $message .= "Date: {$date}\n";
+            $message .= "Time: {$time}\n\n";
+            
+            if ($member->congregation) {
+                $message .= "Congregation: {$member->congregation}\n\n";
+            }
+            
+            $message .= "Thank you for your participation in our AGM. Your voice matters in shaping our church's future.\n\n";
+            $message .= "God bless you!\n\n";
+            $message .= "PCEA Church";
+            
+        } else {
+            // Default message for custom occasions
+            $message = "ATTENDANCE CONFIRMED\n\n";
+            $message .= "Dear {$member->full_name},\n\n";
+            $message .= "Your attendance has been successfully marked for:\n";
+            $message .= "Event: {$eventType}\n";
+            $message .= "Date: {$date}\n";
+            $message .= "Time: {$time}\n\n";
+            
+            if ($member->congregation) {
+                $message .= "Congregation: {$member->congregation}\n\n";
+            }
+            
+            $message .= "Thank you for your presence. May God bless you!\n\n";
+            $message .= "PCEA Church";
         }
-        
-        $message .= "\nThank you for your presence. May God bless you!\n\n";
-        $message .= "PCEA Church";
         
         return $message;
     }

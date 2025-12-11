@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\YouthLeader;
+namespace App\Http\Controllers\GroupLeader;
 
 use App\Http\Controllers\Controller;
 use App\Models\Member;

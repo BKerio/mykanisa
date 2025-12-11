@@ -4,29 +4,29 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
 
-class MemberYouthLeaderMessageScreen extends StatefulWidget {
-  const MemberYouthLeaderMessageScreen({super.key});
+class MemberGroupLeaderMessageScreen extends StatefulWidget {
+  const MemberGroupLeaderMessageScreen({super.key});
 
   @override
-  State<MemberYouthLeaderMessageScreen> createState() =>
-      _MemberYouthLeaderMessageScreenState();
+  State<MemberGroupLeaderMessageScreen> createState() =>
+      _MemberGroupLeaderMessageScreenState();
 }
 
-class _MemberYouthLeaderMessageScreenState
-    extends State<MemberYouthLeaderMessageScreen> {
+class _MemberGroupLeaderMessageScreenState
+    extends State<MemberGroupLeaderMessageScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _messageController = TextEditingController();
 
   bool _isLoading = false;
   bool _isLoadingLeader = true;
-  Map<String, dynamic>? _youthLeader;
+  Map<String, dynamic>? _groupLeader;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadYouthLeader();
+    _loadGroupLeader();
   }
 
   @override
@@ -36,7 +36,7 @@ class _MemberYouthLeaderMessageScreenState
     super.dispose();
   }
 
-  Future<void> _loadYouthLeader() async {
+  Future<void> _loadGroupLeader() async {
     setState(() {
       _isLoadingLeader = true;
       _error = null;
@@ -44,20 +44,20 @@ class _MemberYouthLeaderMessageScreenState
 
     try {
       final result = await API().getRequest(
-        url: Uri.parse('${Config.baseUrl}/members/my-youth-leader'),
+        url: Uri.parse('${Config.baseUrl}/members/my-group-leader'),
       );
 
       if (result.statusCode == 200) {
         final response = jsonDecode(result.body) as Map<String, dynamic>;
-        if (response['status'] == 200 && response['youth_leader'] != null) {
+        if (response['status'] == 200 && response['group_leader'] != null) {
           setState(() {
-            _youthLeader = response['youth_leader'] as Map<String, dynamic>;
+            _groupLeader = response['group_leader'] as Map<String, dynamic>;
             _isLoadingLeader = false;
           });
         } else {
           setState(() {
             _error = response['message']?.toString() ??
-                'No youth leader assigned to your group';
+                'No group leader assigned to your group';
             _isLoadingLeader = false;
           });
         }
@@ -65,13 +65,13 @@ class _MemberYouthLeaderMessageScreenState
         final response = jsonDecode(result.body) as Map<String, dynamic>;
         setState(() {
           _error = response['message']?.toString() ??
-              'Failed to load youth leader information';
+              'Failed to load group leader information';
           _isLoadingLeader = false;
         });
       }
     } catch (e) {
       setState(() {
-        _error = 'Error loading youth leader: ${e.toString()}';
+        _error = 'Error loading group leader: ${e.toString()}';
         _isLoadingLeader = false;
       });
     }
@@ -82,10 +82,10 @@ class _MemberYouthLeaderMessageScreenState
       return;
     }
 
-    if (_youthLeader == null) {
+    if (_groupLeader == null) {
       API.showSnack(
         context,
-        'Youth leader information not available',
+        'Group leader information not available',
         success: false,
       );
       return;
@@ -95,9 +95,9 @@ class _MemberYouthLeaderMessageScreenState
 
     try {
       final result = await API().postRequest(
-        url: Uri.parse('${Config.baseUrl}/member/send-message-to-youth-leader'),
+        url: Uri.parse('${Config.baseUrl}/member/send-message-to-group-leader'),
         data: {
-          'youth_leader_id': _youthLeader!['id'],
+          'group_leader_id': _groupLeader!['id'],
           'title': _titleController.text.trim(),
           'message': _messageController.text.trim(),
         },
@@ -109,7 +109,7 @@ class _MemberYouthLeaderMessageScreenState
           response['status'] == 200) {
         API.showSnack(
           context,
-          'Message sent to youth leader successfully',
+          'Message sent to group leader successfully',
           success: true,
         );
         _titleController.clear();
@@ -151,7 +151,7 @@ class _MemberYouthLeaderMessageScreenState
       backgroundColor: const Color.fromARGB(255, 241, 242, 243),
       appBar: AppBar(
         title: const Text(
-          'Message Youth Leader',
+          'Message Group Leader',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -159,7 +159,7 @@ class _MemberYouthLeaderMessageScreenState
       ),
       body: _isLoadingLeader
           ? const Center(child: CircularProgressIndicator())
-          : _error != null || _youthLeader == null
+          : _error != null || _groupLeader == null
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
@@ -173,7 +173,7 @@ class _MemberYouthLeaderMessageScreenState
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _error ?? 'No Youth Leader Found',
+                          _error ?? 'No Group Leader Found',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -183,7 +183,7 @@ class _MemberYouthLeaderMessageScreenState
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'You don\'t have a youth leader assigned to your group yet.',
+                          'You don\'t have a group leader assigned to your group yet.',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey.shade600,
@@ -192,7 +192,7 @@ class _MemberYouthLeaderMessageScreenState
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton.icon(
-                          onPressed: _loadYouthLeader,
+                          onPressed: _loadGroupLeader,
                           icon: const Icon(Icons.refresh),
                           label: const Text('Retry'),
                           style: ElevatedButton.styleFrom(
@@ -215,7 +215,7 @@ class _MemberYouthLeaderMessageScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Youth Leader Info Card
+                        // Group Leader Info Card
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -237,8 +237,8 @@ class _MemberYouthLeaderMessageScreenState
                               Builder(
                                 builder: (context) {
                                   final raw =
-                                      (_youthLeader!['profile_image_url'] ??
-                                              _youthLeader!['profile_image'])
+                                      (_groupLeader!['profile_image_url'] ??
+                                              _groupLeader!['profile_image'])
                                           ?.toString()
                                           .trim();
                                   String? imageUrl;
@@ -263,7 +263,7 @@ class _MemberYouthLeaderMessageScreenState
                                         : null,
                                     child: imageUrl == null
                                         ? Text(
-                                            _getInitials(_youthLeader!['full_name']
+                                            _getInitials(_groupLeader!['full_name']
                                                 ?.toString()),
                                             style: const TextStyle(
                                               fontWeight: FontWeight.bold,
@@ -281,7 +281,7 @@ class _MemberYouthLeaderMessageScreenState
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _youthLeader!['full_name']?.toString() ??
+                                      _groupLeader!['full_name']?.toString() ??
                                           'Unknown',
                                       style: const TextStyle(
                                         fontSize: 18,
@@ -289,9 +289,9 @@ class _MemberYouthLeaderMessageScreenState
                                         color: Color(0xFF0A1F44),
                                       ),
                                     ),
-                                    if (_youthLeader!['assigned_group'] != null)
+                                    if (_groupLeader!['assigned_group'] != null)
                                       Text(
-                                        _youthLeader!['assigned_group']['name']
+                                        _groupLeader!['assigned_group']['name']
                                                 ?.toString() ??
                                             '',
                                         style: TextStyle(
@@ -299,9 +299,9 @@ class _MemberYouthLeaderMessageScreenState
                                           color: Colors.grey.shade600,
                                         ),
                                       ),
-                                    if (_youthLeader!['telephone'] != null)
+                                    if (_groupLeader!['telephone'] != null)
                                       Text(
-                                        _youthLeader!['telephone']?.toString() ??
+                                        _groupLeader!['telephone']?.toString() ??
                                             '',
                                         style: TextStyle(
                                           fontSize: 12,
@@ -440,4 +440,3 @@ class _MemberYouthLeaderMessageScreenState
     );
   }
 }
-

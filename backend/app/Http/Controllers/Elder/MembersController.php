@@ -90,7 +90,7 @@ class MembersController extends Controller
             'full_name' => 'sometimes|string|max:255',
             'telephone' => 'sometimes|string|max:50',
             'email' => 'sometimes|email',
-            'role' => 'sometimes|string|in:member,deacon,elder,pastor,secretary,treasurer,choir_leader,youth_leader,chairman,sunday_school_teacher',
+            'role' => 'sometimes|string|in:member,deacon,elder,pastor,secretary,treasurer,choir_leader,group_leader,chairman,sunday_school_teacher',
         ]);
         $member->update($validated);
         

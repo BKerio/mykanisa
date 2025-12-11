@@ -41,4 +41,13 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    /**
+     * Get the member profile associated with the user.
+     * key: email
+     */
+    public function member()
+    {
+        return $this->hasOne(Member::class, 'email', 'email');
+    }
 }

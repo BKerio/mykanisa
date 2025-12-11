@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
+import 'package:pcea_church/screen/attendance_history.dart';
 import 'package:pcea_church/screen/digital_card.dart';
 import 'package:pcea_church/screen/login.dart';
 import 'package:pcea_church/screen/profile.dart';
@@ -22,18 +23,14 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _logout() async {
     // Show toast message when logout starts
     if (mounted) {
-      API.showSnack(
-        context,
-        'Logging out...',
-        success: true,
-      );
+      API.showSnack(context, 'Logging out...', success: true);
     }
-    
+
     try {
       // Call backend logout endpoint to delete token on server
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
-      
+
       if (token != null && token.isNotEmpty) {
         try {
           await API().postRequest(
@@ -45,7 +42,7 @@ class _SettingsPageState extends State<SettingsPage> {
           debugPrint('Logout API call failed: $e');
         }
       }
-      
+
       // Clear all local storage
       await prefs.clear();
     } catch (e) {
@@ -53,18 +50,14 @@ class _SettingsPageState extends State<SettingsPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
     }
-    
+
     // Show success toast message
     if (mounted) {
-      API.showSnack(
-        context,
-        'Logged out successfully',
-        success: true,
-      );
+      API.showSnack(context, 'Logged out successfully', success: true);
       // Wait a moment for the toast to be visible before navigating
       await Future.delayed(const Duration(milliseconds: 1000));
     }
-    
+
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
@@ -280,6 +273,22 @@ class _SettingsPageState extends State<SettingsPage> {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const DigitalCardScreen()),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.card_membership_rounded),
+              title: const Text('My Attendance History'),
+              subtitle: const Text('View my attendance records'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AttendanceHistoryPage(),
+                  ),
                 );
               },
             ),

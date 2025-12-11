@@ -1,0 +1,236 @@
+<?php
+
+namespace App\Http\Controllers\Secretary;
+
+use App\Http\Controllers\Controller;
+use App\Models\Minute;
+use App\Models\MinuteAttendee;
+use App\Models\MinuteAgendaItem;
+use App\Models\MinuteActionItem;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+
+class MinutesController extends Controller
+{
+    /**
+     * Display a listing of minutes
+     */
+    public function index(Request $request)
+    {
+        $perPage = $request->get('per_page', 15);
+        
+        $minutes = Minute::with(['creator', 'attendees.member', 'agendaItems', 'actionItems'])
+            ->orderBy('meeting_date', 'desc')
+            ->orderBy('meeting_time', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Minutes retrieved successfully',
+            'data' => $minutes,
+        ]);
+    }
+
+    /**
+     * Store a newly created minute
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'meeting_date' => 'required|date',
+            'meeting_time' => 'required',
+            'meeting_type' => 'required|in:Virtual,Physical,Hybrid',
+            'location' => 'nullable|string|max:255',
+            'is_online' => 'boolean',
+            'online_link' => 'nullable|string|max:500',
+            'notes' => 'nullable|string',
+            'summary' => 'nullable|string',
+            'attendees' => 'nullable|array',
+            'attendees.*.member_id' => 'required|exists:members,id',
+            'attendees.*.status' => 'required|in:present,absent_with_apology,absent_without_apology',
+            'agenda_items' => 'nullable|array',
+            'agenda_items.*.title' => 'required|string',
+            'agenda_items.*.notes' => 'nullable|string',
+            'agenda_items.*.order' => 'nullable|integer',
+            'agenda_items.*.attachments' => 'nullable|array',
+            'action_items' => 'nullable|array',
+            'action_items.*.description' => 'required|string',
+            'action_items.*.responsible_member_id' => 'nullable|exists:members,id',
+            'action_items.*.due_date' => 'nullable|date',
+            'action_items.*.status' => 'nullable|in:Pending,In progress,Done',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Create the minute
+            $minute = Minute::create([
+                'title' => $validated['title'],
+                'meeting_date' => $validated['meeting_date'],
+                'meeting_time' => $validated['meeting_time'],
+                'meeting_type' => $validated['meeting_type'],
+                'location' => $validated['location'] ?? null,
+                'is_online' => $validated['is_online'] ?? false,
+                'online_link' => $validated['online_link'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'summary' => $validated['summary'] ?? null,
+                'created_by' => Auth::id(),
+            ]);
+
+            // Add attendees
+            if (!empty($validated['attendees'])) {
+                foreach ($validated['attendees'] as $attendee) {
+                    MinuteAttendee::create([
+                        'minute_id' => $minute->id,
+                        'member_id' => $attendee['member_id'],
+                        'status' => $attendee['status'],
+                    ]);
+                }
+            }
+
+            // Add agenda items
+            if (!empty($validated['agenda_items'])) {
+                foreach ($validated['agenda_items'] as $index => $item) {
+                    MinuteAgendaItem::create([
+                        'minute_id' => $minute->id,
+                        'title' => $item['title'],
+                        'notes' => $item['notes'] ?? null,
+                        'order' => $item['order'] ?? $index,
+                        'attachments' => $item['attachments'] ?? null,
+                    ]);
+                }
+            }
+
+            // Add action items
+            if (!empty($validated['action_items'])) {
+                foreach ($validated['action_items'] as $item) {
+                    MinuteActionItem::create([
+                        'minute_id' => $minute->id,
+                        'description' => $item['description'],
+                        'responsible_member_id' => $item['responsible_member_id'] ?? null,
+                        'due_date' => $item['due_date'] ?? null,
+                        'status' => $item['status'] ?? 'Pending',
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            // Load relationships for response
+            $minute->load(['creator', 'attendees.member', 'agendaItems', 'actionItems.responsibleMember']);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Minute created successfully',
+                'data' => $minute,
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Failed to create minute: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified minute
+     */
+    public function show($id)
+    {
+        $minute = Minute::with(['creator', 'attendees.member', 'agendaItems', 'actionItems.responsibleMember'])
+            ->find($id);
+
+        if (!$minute) {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Minute not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Minute retrieved successfully',
+            'data' => $minute,
+        ]);
+    }
+
+    /**
+     * Update the specified minute
+     */
+    public function update(Request $request, $id)
+    {
+        $minute = Minute::find($id);
+
+        if (!$minute) {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Minute not found',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'title' => 'sometimes|required|string|max:255',
+            'meeting_date' => 'sometimes|required|date',
+            'meeting_time' => 'sometimes|required',
+            'meeting_type' => 'sometimes|required|in:Virtual,Physical,Hybrid',
+            'location' => 'nullable|string|max:255',
+            'is_online' => 'boolean',
+            'online_link' => 'nullable|string|max:500',
+            'notes' => 'nullable|string',
+            'summary' => 'nullable|string',
+        ]);
+
+        try {
+            $minute->update($validated);
+
+            $minute->load(['creator', 'attendees.member', 'agendaItems', 'actionItems.responsibleMember']);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Minute updated successfully',
+                'data' => $minute,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Failed to update minute: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove the specified minute
+     */
+    public function destroy($id)
+    {
+        $minute = Minute::find($id);
+
+        if (!$minute) {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Minute not found',
+            ], 404);
+        }
+
+        try {
+            $minute->delete();
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Minute deleted successfully',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Failed to delete minute: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+}

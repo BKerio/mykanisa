@@ -6,7 +6,8 @@ import 'package:pcea_church/screen/payments.dart';
 import 'package:pcea_church/screen/member_messages.dart';
 import 'package:pcea_church/screen/pledges.dart';
 import 'package:pcea_church/screen/view_events.dart';
-import 'package:pcea_church/screen/member_youth_leader_message.dart';
+import 'package:pcea_church/screen/member_group_leader_message.dart';
+import 'package:pcea_church/screen/all_church_groups.dart';
 
 class MemberDashboard extends BaseDashboard {
   const MemberDashboard({super.key});
@@ -49,14 +50,14 @@ class MemberDashboard extends BaseDashboard {
       ),
       DashboardCard(
         icon: Icons.group,
-        title: 'Message Youth Leader',
-        color: Colors.orange,
+        title: 'Message Group Leader',
+        color: Colors.teal,
         subtitle: 'Contact your group leader',
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const MemberYouthLeaderMessageScreen(),
+              builder: (context) => const MemberGroupLeaderMessageScreen(),
             ),
           );
         },
@@ -106,6 +107,20 @@ class MemberDashboard extends BaseDashboard {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const ViewEventsScreen()),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.group_add,
+        title: 'Join a Group',
+        color: Colors.teal,
+        subtitle: 'View all groups & join',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AllChurchGroupsScreen(),
+            ),
           );
         },
       ),

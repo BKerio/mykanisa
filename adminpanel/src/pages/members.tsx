@@ -79,7 +79,7 @@ const GroupTags = ({ groups, onClick }: { groups?: string[]; onClick: () => void
   const hiddenCount = groups.length - 2;
 
   return (
-    <div 
+    <div
       onClick={onClick}
       className="flex flex-wrap items-center gap-2 cursor-pointer hover:bg-slate-100 p-2 -m-2 rounded-lg transition-colors group"
     >
@@ -94,7 +94,7 @@ const GroupTags = ({ groups, onClick }: { groups?: string[]; onClick: () => void
       ))}
 
       {hiddenCount > 0 && (
-        <motion.div 
+        <motion.div
           whileHover={{ scale: 1.05 }}
           className="flex items-center justify-center px-2 py-1 rounded-md bg-blue-900 text-white text-[10px] font-bold border border-blue-800"
         >
@@ -131,10 +131,10 @@ const GroupDetailsModal = ({ member, onClose }: { member: MemberDto | null; onCl
         {/* Header (Dark Blue) */}
         <div className="bg-blue-950 p-6 text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5 transform translate-x-4 -translate-y-4">
-             <Users size={120} />
+            <Users size={120} />
           </div>
-          
-          <button 
+
+          <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
           >
@@ -153,7 +153,7 @@ const GroupDetailsModal = ({ member, onClose }: { member: MemberDto | null; onCl
           <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-200 pb-2">
             Active Memberships ({member.group_names?.length || 0})
           </h4>
-          
+
           <div className="space-y-3">
             {member.group_names && member.group_names.length > 0 ? (
               member.group_names.map((group, idx) => (
@@ -183,7 +183,7 @@ const GroupDetailsModal = ({ member, onClose }: { member: MemberDto | null; onCl
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 bg-white text-center">
-          <button 
+          <button
             onClick={onClose}
             className="w-full py-3 bg-blue-950 text-white font-bold rounded-xl hover:bg-blue-900 transition-colors shadow-lg"
           >
@@ -208,7 +208,7 @@ const MembersPage = () => {
   const [activeGroupMember, setActiveGroupMember] = useState<MemberDto | null>(null);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-  const roles = ["member", "deacon", "elder", "pastor", "secretary", "treasurer", "choir_leader", "youth_leader", "chairman"];
+  const roles = ["member", "deacon", "elder", "pastor", "secretary", "treasurer", "choir_leader", "group_leader", "chairman"];
 
   const token = useMemo(() => (typeof window !== "undefined" ? localStorage.getItem("token") : null), []);
 
@@ -242,42 +242,51 @@ const MembersPage = () => {
     const API_URL = import.meta.env.VITE_API_URL;
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const headers = { Authorization: `Bearer ${token}` };
-    
-    // If assigning youth_leader role, show group selection
-    if (newRole === 'youth_leader') {
+
+    // If assigning group_leader role, show group selection
+    if (newRole === 'group_leader') {
       try {
         // Fetch all groups
         const groupsRes = await axios.get(`${API_URL}/groups`, { headers });
         const groups = groupsRes.data?.groups || [];
-        
+
         if (groups.length === 0) {
-          Swal.fire({ 
-            icon: "error", 
-            title: "No Groups Available", 
-            text: "Please create groups first before assigning youth leaders.",
+          Swal.fire({
+            icon: "error",
+            title: "No Groups Available",
+            text: "Please create groups first before assigning group leaders.",
             confirmButtonColor: "#172554"
           });
           return;
         }
-        
+
         // Get member's group names from the member object
         const memberGroupNames = member.group_names || [];
-        
-        // Create options HTML for groups, highlighting which ones the member belongs to
+
+        // Create checkboxes for groups
+        // Only allow selecting groups the member belongs to
         const groupOptions = groups.map((g: any) => {
           const isMember = memberGroupNames.includes(g.name);
-          return `<option value="${g.id}" ${!isMember ? 'disabled' : ''}>${g.name}${!isMember ? ' (Not a member)' : ''}</option>`;
+          // Check if already assigned (if we had the IDs in the frontend, for now assume empty or check logic later)
+          // For now, simple multi-select
+          return `
+            <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 8px; text-align: left;">
+              <input type="checkbox" id="group_${g.id}" value="${g.id}" class="group-checkbox" ${!isMember ? 'disabled' : ''} style="margin-right: 10px; transform: scale(1.2);">
+              <label for="group_${g.id}" style="cursor: ${!isMember ? 'not-allowed' : 'pointer'}; color: ${!isMember ? '#94a3b8' : '#1e293b'}; opacity: ${!isMember ? '0.6' : '1'}; width: 100%;">
+                ${g.name} ${!isMember ? '<span style="font-size: 0.8em; color: #ef4444; font-style: italic;">(Not a member)</span>' : ''}
+              </label>
+            </div>
+          `;
         }).join('');
-        
+
         const result = await Swal.fire({
-          title: `<span class="text-xl font-bold text-slate-800">Assign Youth Leader Role</span>`,
+          title: `<span class="text-xl font-bold text-slate-800">Assign Group Leader Role</span>`,
           html: `
             <p class="text-slate-600 mb-4">Change <b>${member.full_name}</b> to <span class="font-mono text-xs bg-blue-50 text-blue-900 p-1 rounded">${newRole}</span>?</p>
-            <p class="text-xs text-slate-500 mb-3">Select the group this youth leader will be assigned to. The member must already be a member of the selected group.</p>
-            <select id="group-select" class="swal2-input" style="display: block; width: 100%; padding: 0.5rem; margin-top: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.5rem;">
-              <option value="">-- Select Group --</option>
+            <p class="text-xs text-slate-500 mb-3">Select one or more groups this leader will manage.<br>Member must belong to the selected groups.</p>
+            <div style="max-height: 200px; overflow-y: auto; padding: 10px; border: 1px solid #e2e8f0; rounded: 8px; background: #f8fafc;">
               ${groupOptions}
-            </select>
+            </div>
           `,
           icon: "question",
           showCancelButton: true,
@@ -286,70 +295,52 @@ const MembersPage = () => {
           cancelButtonColor: "#94a3b8",
           background: "#fff",
           customClass: { popup: "rounded-2xl" },
-          didOpen: () => {
-            const select = document.getElementById('group-select') as HTMLSelectElement;
-            if (select) {
-              select.focus();
-            }
-          },
           preConfirm: () => {
-            const select = document.getElementById('group-select') as HTMLSelectElement;
-            const selectedGroupId = select?.value;
-            if (!selectedGroupId) {
-              Swal.showValidationMessage('Please select a group');
+            const checkboxes = document.querySelectorAll('.group-checkbox:checked');
+            const selectedIds: number[] = [];
+            checkboxes.forEach((cb: any) => selectedIds.push(parseInt(cb.value)));
+
+            if (selectedIds.length === 0) {
+              Swal.showValidationMessage('Please select at least one group');
               return false;
             }
-            return selectedGroupId;
+            return selectedIds;
           }
         });
 
         if (!result.isConfirmed || !result.value) return;
 
-        const selectedGroupId = parseInt(result.value as string);
-        
-        // Verify member is part of selected group
-        const selectedGroup = groups.find((g: any) => g.id === selectedGroupId);
-        //const memberGroupNames = member.group_names || [];
-        
-        if (!selectedGroup || !memberGroupNames.includes(selectedGroup.name)) {
-          Swal.fire({ 
-            icon: "error", 
-            title: "Validation Error", 
-            text: `Member must be a member of "${selectedGroup?.name}" before being assigned as youth leader.`,
-            confirmButtonColor: "#172554"
-          });
-          return;
-        }
+        const selectedGroupIds = result.value as number[];
 
-        // Update role with assigned group
+        // Update role with assigned group IDs
         try {
           await axios.put(
-            `${API_URL}/admin/members/${member.id}`, 
-            { role: newRole, assigned_group_id: selectedGroupId }, 
+            `${API_URL}/admin/members/${member.id}`,
+            { role: newRole, assigned_group_ids: selectedGroupIds },
             { headers }
           );
           setRows((prev) => prev.map((r) => (r.id === member.id ? { ...r, role: newRole } : r)));
-          Swal.fire({ 
-            icon: "success", 
-            title: "Role Updated", 
-            text: `${member.full_name} is now youth leader for ${selectedGroup?.name}`,
-            timer: 2000, 
-            showConfirmButton: false, 
-            toast: true, 
-            position: 'top-end' 
+          Swal.fire({
+            icon: "success",
+            title: "Role Updated",
+            text: `${member.full_name} is now a Group Leader for ${selectedGroupIds.length} group(s).`,
+            timer: 2000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
           });
         } catch (error: any) {
-          Swal.fire({ 
-            icon: "error", 
-            title: "Update Failed", 
-            text: error?.response?.data?.message || "Failed to update role. Member may not be part of selected group.",
+          Swal.fire({
+            icon: "error",
+            title: "Update Failed",
+            text: error?.response?.data?.message || "Failed to update role.",
             confirmButtonColor: "#172554"
           });
         }
       } catch (error: any) {
-        Swal.fire({ 
-          icon: "error", 
-          title: "Error", 
+        Swal.fire({
+          icon: "error",
+          title: "Error",
           text: error?.response?.data?.message || "Failed to load groups",
           confirmButtonColor: "#172554"
         });
@@ -384,9 +375,9 @@ const MembersPage = () => {
   if (isFirstLoad && loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <DashboardLoader 
-          title="Loading Directory" 
-          subtitle="Fetching member records..." 
+        <DashboardLoader
+          title="Loading Directory"
+          subtitle="Fetching member records..."
         />
       </div>
     );
@@ -394,21 +385,21 @@ const MembersPage = () => {
 
   return (
     <div className="p-6 md:p-10 bg-slate-50 min-h-screen font-sans text-slate-900">
-      
+
       {/* Modal for Groups */}
       <AnimatePresence>
         {activeGroupMember && (
-          <GroupDetailsModal 
-            member={activeGroupMember} 
-            onClose={() => setActiveGroupMember(null)} 
+          <GroupDetailsModal
+            member={activeGroupMember}
+            onClose={() => setActiveGroupMember(null)}
           />
         )}
       </AnimatePresence>
 
       {/* --- Header Section --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }} 
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
         >
           <div className="flex items-center gap-3 mb-1">
@@ -430,7 +421,7 @@ const MembersPage = () => {
               className="pl-10 pr-4 py-2.5 w-full sm:w-72 bg-white border border-slate-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 transition-all outline-none text-slate-700"
             />
           </div>
-          <button 
+          <button
             onClick={fetchMembers}
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 hover:border-blue-900 hover:text-blue-900 transition-all shadow-sm active:scale-95"
           >
@@ -462,11 +453,11 @@ const MembersPage = () => {
                 <tr key={i}>
                   <td colSpan={5} className="px-4 py-2">
                     <div className="h-24 bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-4 shadow-sm">
-                       <div className="w-10 h-10 bg-slate-200 rounded-full animate-pulse" />
-                       <div className="flex-1 space-y-2">
-                          <div className="h-4 bg-slate-200 rounded w-1/4 animate-pulse" />
-                          <div className="h-3 bg-slate-200 rounded w-1/3 animate-pulse" />
-                       </div>
+                      <div className="w-10 h-10 bg-slate-200 rounded-full animate-pulse" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-slate-200 rounded w-1/4 animate-pulse" />
+                        <div className="h-3 bg-slate-200 rounded w-1/3 animate-pulse" />
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -527,8 +518,8 @@ const MembersPage = () => {
 
                     {/* 3. Interactive Groups Column */}
                     <td className="p-4">
-                      <GroupTags 
-                        groups={m.group_names} 
+                      <GroupTags
+                        groups={m.group_names}
                         onClick={() => setActiveGroupMember(m)}
                       />
                     </td>
@@ -537,8 +528,8 @@ const MembersPage = () => {
                     <td className="p-4">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center text-xs font-medium text-slate-800">
-                           <MapPin className="w-3 h-3 mr-1 text-slate-400" />
-                           {m.congregation}
+                          <MapPin className="w-3 h-3 mr-1 text-slate-400" />
+                          {m.congregation}
                         </div>
                         <div className="text-[11px] text-slate-500 pl-4">
                           {m.district || "No District"} • {m.region || "No Region"}
@@ -549,14 +540,14 @@ const MembersPage = () => {
                     {/* 5. Contact Column */}
                     <td className="p-4 rounded-r-2xl">
                       <div className="flex flex-col gap-1.5">
-                         <div className="flex items-center text-xs text-slate-600">
-                            <Phone className="w-3 h-3 mr-2 text-slate-400" />
-                            {m.telephone || "-"}
-                         </div>
-                         <div className="flex items-center text-xs text-slate-600">
-                            <Mail className="w-3 h-3 mr-2 text-slate-400" />
-                            <span className="truncate max-w-[120px]" title={m.email}>{m.email || "-"}</span>
-                         </div>
+                        <div className="flex items-center text-xs text-slate-600">
+                          <Phone className="w-3 h-3 mr-2 text-slate-400" />
+                          {m.telephone || "-"}
+                        </div>
+                        <div className="flex items-center text-xs text-slate-600">
+                          <Mail className="w-3 h-3 mr-2 text-slate-400" />
+                          <span className="truncate max-w-[120px]" title={m.email}>{m.email || "-"}</span>
+                        </div>
                       </div>
                     </td>
                   </motion.tr>
@@ -565,15 +556,15 @@ const MembersPage = () => {
             )}
           </tbody>
         </table>
-        
+
         {!loading && rows.length === 0 && (
-           <div className="text-center py-20">
-             <div className="inline-flex p-4 rounded-full bg-slate-100 text-slate-400 mb-4">
-               <Search className="w-8 h-8" />
-             </div>
-             <h3 className="text-lg font-medium text-slate-900">No members found</h3>
-             <p className="text-slate-500 text-sm mt-1">Try adjusting your search or filters.</p>
-           </div>
+          <div className="text-center py-20">
+            <div className="inline-flex p-4 rounded-full bg-slate-100 text-slate-400 mb-4">
+              <Search className="w-8 h-8" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900">No members found</h3>
+            <p className="text-slate-500 text-sm mt-1">Try adjusting your search or filters.</p>
+          </div>
         )}
       </div>
 

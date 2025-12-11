@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:http/http.dart' as http;
 import 'package:pcea_church/components/responsive_layout.dart';
 import 'package:pcea_church/config/server.dart';
@@ -1147,10 +1148,23 @@ class _RegisterState extends State<Register> {
                   ),
                 ),
                 if (isLoadingParishes)
-                  const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                  SpinKitFadingCircle(
+                    size: 5,
+                    duration: const Duration(milliseconds: 1800),
+                    itemBuilder: (context, index) {
+                      final palette = [
+                        const Color(0xFF0A1F44),
+                        Colors.red,
+                        Colors.blue,
+                        Colors.green,
+                      ];
+                      return DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: palette[index % palette.length],
+                          shape: BoxShape.circle,
+                        ),
+                      );
+                    },
                   )
                 else
                   const Icon(Icons.search, color: Colors.grey),

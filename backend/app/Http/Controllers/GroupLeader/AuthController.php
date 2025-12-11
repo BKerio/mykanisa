@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\YouthLeader;
+namespace App\Http\Controllers\GroupLeader;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -8,15 +8,15 @@ use Illuminate\Http\Request;
 class AuthController extends Controller
 {
     /**
-     * Get the authenticated youth leader's information
+     * Get the authenticated group leader's information
      */
     public function me(Request $request)
     {
         $user = $request->user();
         $member = \App\Models\Member::where('email', $user->email)->first();
         
-        if (!$member || $member->role !== 'youth_leader') {
-            return response()->json(['message' => 'Access denied. Youth Leader role required.'], 403);
+        if (!$member || $member->role !== 'group_leader') {
+            return response()->json(['message' => 'Access denied. Group Leader role required.'], 403);
         }
 
         // Load assigned group if exists

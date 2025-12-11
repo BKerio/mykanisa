@@ -31,7 +31,7 @@ class Member extends Model
         'telephone',
         'region',
         'role',
-        'assigned_group_id',
+        'assigned_group_ids',
         'is_active',
         'email_verified_at',
     ];
@@ -42,6 +42,7 @@ class Member extends Model
         'takes_holy_communion' => 'boolean',
         'is_active' => 'boolean',
         'email_verified_at' => 'datetime',
+        'assigned_group_ids' => 'array',
     ];
 
     public function dependencies()
@@ -65,11 +66,31 @@ class Member extends Model
     }
 
     /**
-     * Get the assigned group for youth leaders
+     * Get the assigned groups for group leaders
+     * Returns a collection of Groups based on the JSON IDs
      */
-    public function assignedGroup()
+    public function assignedGroups()
     {
-        return $this->belongsTo(Group::class, 'assigned_group_id');
+        // Since we can't use a direct relationship for JSON array, 
+        // we'll return a query builder constrained by the IDs
+        $ids = $this->assigned_group_ids ?? [];
+        if (!is_array($ids)) {
+            // Handle migrated data case or string format
+            $ids = json_decode($ids, true) ?? [];
+            if (!is_array($ids) && !empty($this->assigned_group_ids)) {
+                $ids = [(int)$this->assigned_group_ids];
+            }
+        }
+        
+        return Group::whereIn('id', $ids);
+    }
+
+    /**
+     * Helper to get assigned groups as a collection immediately
+     */
+    public function getAssignedGroupsAttribute()
+    {
+        return $this->assignedGroups()->get();
     }
 
     /**
@@ -80,8 +101,8 @@ class Member extends Model
         // Check in the JSON groups field
         if ($this->groups) {
             try {
-                $groupIds = json_decode($this->groups, true);
-                if (is_array($groupIds) && in_array($groupId, $groupIds)) {
+                $groupIds = is_string($this->groups) ? json_decode($this->groups, true) : $this->groups;
+                if (is_array($groupIds) && in_array((int)$groupId, array_map('intval', $groupIds))) {
                     return true;
                 }
             } catch (\Exception $e) {

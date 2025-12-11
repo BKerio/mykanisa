@@ -6,7 +6,7 @@ import 'package:pcea_church/screen/deacon_dashboard.dart';
 import 'package:pcea_church/screen/secretary_dashboard.dart';
 import 'package:pcea_church/screen/treasurer_dashboard.dart';
 import 'package:pcea_church/screen/choir_leader_dashboard.dart';
-import 'package:pcea_church/screen/youth_leader_dashboard.dart';
+import 'package:pcea_church/screen/group_leader_dashboard.dart';
 import 'package:pcea_church/screen/sunday_school_teacher_dashboard.dart';
 import 'package:pcea_church/screen/member_dashboard.dart';
 
@@ -32,9 +32,9 @@ class DashboardFactory {
       case 'choir_leader':
       case 'choir leader':
         return const ChoirLeaderDashboard();
-      case 'youth_leader':
-      case 'youth leader':
-        return const YouthLeaderDashboard();
+      case 'group_leader':
+      case 'group leader':
+        return const GroupLeaderDashboard();
       case 'sunday_school_teacher':
       case 'sunday school teacher':
         return const SundaySchoolTeacherDashboard();
@@ -64,9 +64,9 @@ class DashboardFactory {
       case 'choir_leader':
       case 'choir leader':
         return 'Choir Leader';
-      case 'youth_leader':
-      case 'youth leader':
-        return 'Youth Leader';
+      case 'group_leader':
+      case 'group leader':
+        return 'Group Leader';
       case 'sunday_school_teacher':
       case 'sunday school teacher':
         return 'Sunday School Teacher';
@@ -94,8 +94,8 @@ class DashboardFactory {
       case 'choir_leader':
       case 'choir leader':
         return const Color(0xFF0A1F44);
-      case 'youth_leader':
-      case 'youth leader':
+      case 'group_leader':
+      case 'group leader':
         return const Color(0xFF0A1F44);
       case 'sunday_school_teacher':
       case 'sunday school teacher':
@@ -124,8 +124,8 @@ class DashboardFactory {
       case 'choir_leader':
       case 'choir leader':
         return const Color(0xFF0A1F44);
-      case 'youth_leader':
-      case 'youth leader':
+      case 'group_leader':
+      case 'group leader':
         return const Color(0xFF0A1F44);
       case 'sunday_school_teacher':
       case 'sunday school teacher':
@@ -154,9 +154,9 @@ class DashboardFactory {
       case 'choir_leader':
       case 'choir leader':
         return Icons.music_note;
-      case 'youth_leader':
-      case 'youth leader':
-        return Icons.child_care;
+      case 'group_leader':
+      case 'group leader':
+        return Icons.supervised_user_circle;
       case 'sunday_school_teacher':
       case 'sunday school teacher':
         return Icons.school;
@@ -183,8 +183,8 @@ class DashboardFactory {
     const ministryRoles = [
       'choir_leader',
       'choir leader',
-      'youth_leader',
-      'youth leader',
+      'group_leader',
+      'group leader',
       'sunday_school_teacher',
       'sunday school teacher',
     ];
@@ -201,7 +201,7 @@ class DashboardFactory {
       'treasurer',
       'chairman',
       'choir_leader',
-      'youth_leader',
+      'group_leader',
       'sunday_school_teacher',
       'member',
     ];
@@ -212,7 +212,7 @@ class DashboardFactory {
     return {
       'Leadership': ['pastor', 'elder', 'deacon', 'chairman'],
       'Administrative': ['secretary', 'treasurer'],
-      'Ministry': ['choir_leader', 'youth_leader', 'sunday_school_teacher'],
+      'Ministry': ['choir_leader', 'group_leader', 'sunday_school_teacher'],
       'General': ['member'],
     };
   }

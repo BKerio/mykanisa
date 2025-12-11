@@ -141,7 +141,6 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
         centerTitle: true,
         backgroundColor: const Color(0xFF0A1F44),
         foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black87),
         title: const Text(
           'My Church Groups',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),

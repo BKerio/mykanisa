@@ -184,9 +184,9 @@ class RolePermissionSeeder extends Seeder
                 ]
             ],
             [
-                'name' => 'Youth Leader',
-                'slug' => 'youth_leader',
-                'description' => 'Leader of youth ministry',
+                'name' => 'Group Leader',
+                'slug' => 'group_leader',
+                'description' => 'Leader of a church group',
                 'is_system_role' => true,
                 'hierarchy_level' => 40,
                 'permissions' => [

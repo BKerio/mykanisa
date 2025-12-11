@@ -69,9 +69,11 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::get('/payments/me', [PaymentController::class, 'mine']);
     
     // Member group endpoints
-    Route::get('/members/my-youth-leader', [\App\Http\Controllers\Member\GroupsController::class, 'getMyYouthLeader']);
-    Route::post('/member/send-message-to-youth-leader', [\App\Http\Controllers\Member\GroupsController::class, 'sendMessageToYouthLeader']);
+    Route::get('/members/my-group-leader', [\App\Http\Controllers\Member\GroupsController::class, 'getMyGroupLeader']);
+    Route::post('/member/send-message-to-group-leader', [\App\Http\Controllers\Member\GroupsController::class, 'sendMessageToGroupLeader']);
     Route::get('/groups/{groupId}/activities', [\App\Http\Controllers\Member\GroupsController::class, 'getGroupActivities']);
+    Route::post('/member/groups/join-request', [\App\Http\Controllers\Member\GroupsController::class, 'requestJoinGroup']);
+    Route::get('/member/groups/my-pending-requests', [\App\Http\Controllers\Member\GroupsController::class, 'getMyPendingRequests']);
     
     // Contributions endpoints
     Route::get('/contributions/summary', [ContributionsController::class, 'getMemberSummary']);
@@ -342,6 +344,13 @@ Route::middleware(['auth:sanctum', 'role:secretary'])->group(function(){
         Route::post('/members', [\App\Http\Controllers\Secretary\MembersController::class, 'store']);
         Route::get('/members/{member}', [\App\Http\Controllers\Secretary\MembersController::class, 'show']);
         Route::put('/members/{member}', [\App\Http\Controllers\Secretary\MembersController::class, 'update']);
+        
+        // Minutes routes
+        Route::get('/minutes', [\App\Http\Controllers\Secretary\MinutesController::class, 'index']);
+        Route::post('/minutes', [\App\Http\Controllers\Secretary\MinutesController::class, 'store']);
+        Route::get('/minutes/{id}', [\App\Http\Controllers\Secretary\MinutesController::class, 'show']);
+        Route::put('/minutes/{id}', [\App\Http\Controllers\Secretary\MinutesController::class, 'update']);
+        Route::delete('/minutes/{id}', [\App\Http\Controllers\Secretary\MinutesController::class, 'destroy']);
     });
 });
 
@@ -376,23 +385,25 @@ Route::middleware(['auth:sanctum', 'role:choir_leader'])->group(function(){
     });
 });
 
-// Youth Leader routes
-Route::middleware(['auth:sanctum', 'role:youth_leader'])->group(function(){
-    Route::prefix('youth-leader')->group(function(){
-        Route::get('/me', [\App\Http\Controllers\YouthLeader\AuthController::class, 'me']);
-        Route::post('/logout', [\App\Http\Controllers\YouthLeader\AuthController::class, 'logout']);
+// Group Leader routes
+Route::middleware(['auth:sanctum', 'role:group_leader'])->group(function(){
+    Route::prefix('group-leader')->group(function(){
+        Route::get('/me', [\App\Http\Controllers\GroupLeader\AuthController::class, 'me']);
+        Route::post('/logout', [\App\Http\Controllers\GroupLeader\AuthController::class, 'logout']);
         
-        Route::get('/youth-members', [\App\Http\Controllers\YouthLeader\YouthController::class, 'members']);
-        Route::post('/add-member', [\App\Http\Controllers\YouthLeader\YouthController::class, 'addMember']);
-        Route::get('/events', [\App\Http\Controllers\YouthLeader\YouthController::class, 'events']);
-        Route::post('/create-event', [\App\Http\Controllers\YouthLeader\YouthController::class, 'createEvent']);
-        Route::get('/statistics', [\App\Http\Controllers\YouthLeader\YouthController::class, 'statistics']);
+        Route::get('/youth-members', [\App\Http\Controllers\GroupLeader\YouthController::class, 'members']);
+        Route::post('/add-member', [\App\Http\Controllers\GroupLeader\YouthController::class, 'addMember']);
+        Route::get('/events', [\App\Http\Controllers\GroupLeader\YouthController::class, 'events']);
+        Route::post('/create-event', [\App\Http\Controllers\GroupLeader\YouthController::class, 'createEvent']);
+        Route::get('/statistics', [\App\Http\Controllers\GroupLeader\YouthController::class, 'statistics']);
         
         // Group management routes
-        Route::get('/assigned-group', [\App\Http\Controllers\YouthLeader\GroupsController::class, 'getAssignedGroup']);
-        Route::get('/group-members', [\App\Http\Controllers\YouthLeader\GroupsController::class, 'getGroupMembers']);
-        Route::post('/broadcast-message', [\App\Http\Controllers\YouthLeader\GroupsController::class, 'broadcastMessage']);
-        Route::post('/send-message', [\App\Http\Controllers\YouthLeader\GroupsController::class, 'sendIndividualMessage']);
+        Route::get('/assigned-group', [\App\Http\Controllers\GroupLeader\GroupsController::class, 'getAssignedGroup']);
+        Route::get('/group-members', [\App\Http\Controllers\GroupLeader\GroupsController::class, 'getGroupMembers']);
+        Route::post('/broadcast-message', [\App\Http\Controllers\GroupLeader\GroupsController::class, 'broadcastMessage']);
+        Route::post('/send-message', [\App\Http\Controllers\GroupLeader\GroupsController::class, 'sendIndividualMessage']);
+        Route::get('/join-requests', [\App\Http\Controllers\GroupLeader\GroupsController::class, 'getJoinRequests']);
+        Route::post('/join-requests/{id}/approve', [\App\Http\Controllers\GroupLeader\GroupsController::class, 'approveJoinRequest']);
     });
 });
 
@@ -483,5 +494,8 @@ Route::middleware(['auth:sanctum'])->group(function(){
         Route::get('/elders', [\App\Http\Controllers\Member\DashboardController::class, 'getElders']);
         Route::post('/send-message-to-elder', [\App\Http\Controllers\Member\DashboardController::class, 'sendMessageToElder']);
         Route::get('/sent-messages', [\App\Http\Controllers\Member\DashboardController::class, 'sentMessages']);
+        
+        // Attendance History
+        Route::get('/attendance', [\App\Http\Controllers\Member\AttendanceController::class, 'history']);
     });
 });

@@ -4,8 +4,8 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
-import 'package:pcea_church/screen/member_youth_leader_message.dart';
-import 'package:pcea_church/screen/youth_leader_dashboard.dart';
+import 'package:pcea_church/screen/member_group_leader_message.dart';
+import 'package:pcea_church/screen/group_leader_dashboard.dart';
 
 class GroupActivitiesScreen extends StatefulWidget {
   final int groupId;
@@ -331,7 +331,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
   Widget _buildInfoTab() {
     final group = _groupData?['group'] as Map<String, dynamic>? ?? {};
     final memberCount = _groupData?['member_count'] ?? 0;
-    final youthLeader = _groupData?['youth_leader'] as Map<String, dynamic>?;
+    final groupLeader = _groupData?['group_leader'] as Map<String, dynamic>?;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -445,7 +445,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                     Expanded(
                       child: _buildStatCard(
                         'Leader',
-                        youthLeader != null ? 'Assigned' : 'None',
+                        groupLeader != null ? 'Assigned' : 'None',
                         Icons.person,
                         Color(0xFF0A1F44),
                       ),
@@ -454,7 +454,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                 )
               : _buildStatCard(
                   'Group Leader',
-                  youthLeader != null ? 'Assigned' : 'None',
+                  groupLeader != null ? 'Assigned' : 'None',
                   Icons.person,
                   Color(0xFF0A1F44),
                 ),
@@ -554,7 +554,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
-                            const YouthGroupCommunicationScreen(),
+                            const GroupCommunicationScreen(),
                       ),
                     ).then(
                       (_) => _loadGroupActivities(),
@@ -632,7 +632,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                               context,
                               MaterialPageRoute(
                                 builder: (context) =>
-                                    YouthIndividualMessageScreen(
+                                    GroupIndividualMessageScreen(
                                       recipientId: member['id'] as int,
                                       recipientName:
                                           member['full_name']?.toString() ??
@@ -655,9 +655,9 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
   }
 
   Widget _buildLeaderTab() {
-    final youthLeader = _groupData?['youth_leader'] as Map<String, dynamic>?;
+    final groupLeader = _groupData?['group_leader'] as Map<String, dynamic>?;
 
-    if (youthLeader == null) {
+    if (groupLeader == null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -671,7 +671,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                'No Youth Leader Assigned',
+                'No Group Leader Assigned',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -694,7 +694,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Youth Leader Card
+          // Group Leader Card
           Card(
             elevation: 3,
             shape: RoundedRectangleBorder(
@@ -711,7 +711,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                 children: [
                   Builder(
                     builder: (context) {
-                      final imageUrl = _getLeaderImageUrl(youthLeader);
+                      final imageUrl = _getLeaderImageUrl(groupLeader);
                       return CircleAvatar(
                         radius: 55,
                         backgroundColor: const Color(
@@ -723,7 +723,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                         child: imageUrl == null
                             ? Text(
                                 _getInitials(
-                                  youthLeader['full_name']?.toString(),
+                                  groupLeader['full_name']?.toString(),
                                 ),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
@@ -739,7 +739,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                   const SizedBox(height: 18),
 
                   Text(
-                    youthLeader['full_name']?.toString() ?? 'Unknown',
+                    groupLeader['full_name']?.toString() ?? 'Unknown',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -750,7 +750,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                   const SizedBox(height: 10),
 
                   Chip(
-                    label: const Text('Youth Leader'),
+                    label: const Text('Group Leader'),
                     backgroundColor: const Color(0xFF0A1F44).withOpacity(0.12),
                     labelStyle: const TextStyle(
                       color: Color(0xFF0A1F44),
@@ -765,7 +765,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                     ),
                   ),
 
-                  if (youthLeader['email'] != null) ...[
+                  if (groupLeader['email'] != null) ...[
                     const SizedBox(height: 20),
                     ListTile(
                       dense: true,
@@ -775,13 +775,13 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                         color: Color(0xFF0A1F44),
                       ),
                       title: Text(
-                        youthLeader['email'].toString(),
+                        groupLeader['email'].toString(),
                         style: const TextStyle(fontSize: 15),
                       ),
                     ),
                   ],
 
-                  if (youthLeader['telephone'] != null)
+                  if (groupLeader['telephone'] != null)
                     ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
@@ -790,7 +790,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                         color: Color(0xFF0A1F44),
                       ),
                       title: Text(
-                        youthLeader['telephone'].toString(),
+                        groupLeader['telephone'].toString(),
                         style: const TextStyle(fontSize: 15),
                       ),
                     ),
@@ -801,7 +801,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Message Youth Leader'),
+                      label: const Text('Message Group Leader'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0A1F44),
                         foregroundColor: Colors.white,
@@ -815,7 +815,7 @@ class _GroupActivitiesScreenState extends State<GroupActivitiesScreen>
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                const MemberYouthLeaderMessageScreen(),
+                                const MemberGroupLeaderMessageScreen(),
                           ),
                         );
                       },
