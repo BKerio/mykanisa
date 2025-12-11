@@ -376,12 +376,19 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
                 headers: ['Task', 'Responsible', 'Due Date', 'Status'],
                 data: actionItems
                     .map(
-                      (item) => [
-                        item['description'] ?? '',
-                        item['responsible_member']?['name'] ?? 'Unassigned',
-                        item['due_date'] ?? '',
-                        item['status'] ?? '',
-                      ],
+                      (item) {
+                        String status = item['status'] ?? 'Pending';
+                        String reason = item['status_reason'] ?? '';
+                        if (reason.isNotEmpty) {
+                          status += '\n($reason)';
+                        }
+                        return [
+                          item['description'] ?? '',
+                          item['responsible_member']?['name'] ?? 'Unassigned',
+                          item['due_date'] ?? '',
+                          status,
+                        ];
+                      },
                     )
                     .toList(),
               )

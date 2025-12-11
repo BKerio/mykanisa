@@ -33,12 +33,13 @@ class AgendaItem {
 }
 
 class ActionItem {
-  String description, status;
+  String description, status, statusReason;
   String? responsible;
   DateTime? dueDate;
   ActionItem({
     this.description = '',
     this.status = 'Pending',
+    this.statusReason = '',
     this.responsible,
     this.dueDate,
   });
@@ -161,6 +162,7 @@ class _MinutesPageState extends State<MinutesPage> {
       _actions.add(ActionItem(
         description: item['description'] ?? '',
         status: item['status'] ?? 'Pending',
+        statusReason: item['status_reason'] ?? '',
         responsible: memberExists ? responsibleId : null,
         dueDate: item['due_date'] != null ? DateTime.parse(item['due_date']) : null,
       ));
@@ -401,7 +403,9 @@ ${_notesCtrl.text.isEmpty ? 'No general notes recorded.' : _notesCtrl.text}
               // Ensure responsible ID is parsed correctly
               'responsible_member_id': int.tryParse(a.responsible ?? '0'),
               'due_date': a.dueDate?.toIso8601String().split('T')[0],
+              'due_date': a.dueDate?.toIso8601String().split('T')[0],
               'status': a.status,
+              'status_reason': a.statusReason,
             },
           )
           .toList();
@@ -1675,6 +1679,30 @@ ${_notesCtrl.text.isEmpty ? 'No general notes recorded.' : _notesCtrl.text}
                           ),
                         ),
                       ],
+                    ),
+                    SizedBox(height: 12),
+                    Row(
+                        children: [
+                            Expanded(
+                                child: DropdownButtonFormField<String>(
+                                    value: item.status,
+                                    decoration: _deco('Status'),
+                                    items: ['Pending', 'In progress', 'Done']
+                                        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                                        .toList(),
+                                    onChanged: (v) => setState(() => item.status = v!),
+                                ),
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                                flex: 2,
+                                child: TextFormField(
+                                    initialValue: item.statusReason,
+                                    decoration: _deco('Status Reason / Notes'),
+                                    onChanged: (v) => item.statusReason = v,
+                                ),
+                            ),
+                        ],
                     ),
                   ],
                 ),

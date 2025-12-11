@@ -71,6 +71,7 @@ class MinutesController extends Controller
             'action_items.*.responsible_member_id' => 'nullable|exists:members,id',
             'action_items.*.due_date' => 'nullable|date',
             'action_items.*.status' => 'nullable|in:Pending,In progress,Done',
+            'action_items.*.status_reason' => 'nullable|string',
         ]);
 
         try {
@@ -123,6 +124,7 @@ class MinutesController extends Controller
                         'responsible_member_id' => $item['responsible_member_id'] ?? null,
                         'due_date' => $item['due_date'] ?? null,
                         'status' => $item['status'] ?? 'Pending',
+                        'status_reason' => $item['status_reason'] ?? null,
                     ]);
                 }
             }
@@ -209,6 +211,17 @@ class MinutesController extends Controller
             ], 404);
         }
 
+        // Decode JSON strings if present (similar to store)
+        if ($request->has('attendees') && is_string($request->input('attendees'))) {
+            $request->merge(['attendees' => json_decode($request->input('attendees'), true)]);
+        }
+        if ($request->has('agenda_items') && is_string($request->input('agenda_items'))) {
+            $request->merge(['agenda_items' => json_decode($request->input('agenda_items'), true)]);
+        }
+        if ($request->has('action_items') && is_string($request->input('action_items'))) {
+            $request->merge(['action_items' => json_decode($request->input('action_items'), true)]);
+        }
+
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'meeting_date' => 'sometimes|required|date',
@@ -219,10 +232,75 @@ class MinutesController extends Controller
             'online_link' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'summary' => 'nullable|string',
+            'attendees' => 'nullable|array',
+            'attendees.*.member_id' => 'sometimes|required|exists:members,id',
+            'attendees.*.status' => 'sometimes|required|in:present,absent_with_apology,absent_without_apology',
+            'agenda_items' => 'nullable|array',
+            'agenda_items.*.title' => 'sometimes|required|string',
+            'agenda_items.*.notes' => 'nullable|string',
+            'agenda_items.*.order' => 'nullable|integer',
+            'agenda_items.*.attachments' => 'nullable|array',
+            'action_items' => 'nullable|array',
+            'action_items.*.description' => 'sometimes|required|string',
+            'action_items.*.responsible_member_id' => 'nullable|exists:members,id',
+            'action_items.*.due_date' => 'nullable|date',
+            'action_items.*.status' => 'nullable|in:Pending,In progress,Done',
+            'action_items.*.status_reason' => 'nullable|string',
         ]);
 
         try {
+            DB::beginTransaction();
+
             $minute->update($validated);
+
+            // Sync Attendees
+            if ($request->has('attendees')) {
+                MinuteAttendee::where('minute_id', $minute->id)->delete();
+                if (!empty($validated['attendees'])) {
+                    foreach ($validated['attendees'] as $attendee) {
+                        MinuteAttendee::create([
+                            'minute_id' => $minute->id,
+                            'member_id' => $attendee['member_id'],
+                            'status' => $attendee['status'],
+                        ]);
+                    }
+                }
+            }
+
+            // Sync Agenda Items
+            if ($request->has('agenda_items')) {
+                MinuteAgendaItem::where('minute_id', $minute->id)->delete();
+                if (!empty($validated['agenda_items'])) {
+                    foreach ($validated['agenda_items'] as $index => $item) {
+                        MinuteAgendaItem::create([
+                            'minute_id' => $minute->id,
+                            'title' => $item['title'],
+                            'notes' => $item['notes'] ?? null,
+                            'order' => $item['order'] ?? $index,
+                            'attachments' => $item['attachments'] ?? null,
+                        ]);
+                    }
+                }
+            }
+
+            // Sync Action Items
+            if ($request->has('action_items')) {
+                MinuteActionItem::where('minute_id', $minute->id)->delete();
+                if (!empty($validated['action_items'])) {
+                    foreach ($validated['action_items'] as $item) {
+                        MinuteActionItem::create([
+                            'minute_id' => $minute->id,
+                            'description' => $item['description'],
+                            'responsible_member_id' => $item['responsible_member_id'] ?? null,
+                            'due_date' => $item['due_date'] ?? null,
+                            'status' => $item['status'] ?? 'Pending',
+                            'status_reason' => $item['status_reason'] ?? null,
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
 
             $minute->load(['creator', 'attendees.member', 'agendaItems', 'actionItems.responsibleMember']);
 
@@ -233,6 +311,7 @@ class MinutesController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'status' => 500,
                 'message' => 'Failed to update minute: ' . $e->getMessage(),
