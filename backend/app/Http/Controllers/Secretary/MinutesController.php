@@ -132,6 +132,31 @@ class MinutesController extends Controller
             // Load relationships for response
             $minute->load(['creator', 'attendees.member', 'agendaItems', 'actionItems.responsibleMember']);
 
+            // Send SMS notifications
+            try {
+                $smsService = new \App\Services\SmsService();
+                foreach ($minute->attendees as $attendee) {
+                    if (in_array($attendee->status, ['present', 'absent_with_apology']) && $attendee->member && $attendee->member->telephone) {
+                        $memberName = $attendee->member->full_name ?? 'Member';
+                        $message = "Greetings {$memberName}, Minutes for '{$minute->title}' held on {$minute->meeting_date} are now available. Please log in to the app to view them.";
+                        $smsService->sendSms($attendee->member->telephone, $message);
+                    }
+                }
+                
+                // Send SMS to responsible members for action items
+                foreach ($minute->actionItems as $action) {
+                     if ($action->responsibleMember && $action->responsibleMember->telephone) {
+                         $memberName = $action->responsibleMember->full_name ?? 'Member';
+                         $dueDate = $action->due_date ? ' Due: ' . $action->due_date : '';
+                         $message = "Dear {$memberName}, you have been assigned a task: \"{$action->description}\"{$dueDate}. Please check the minutes app for details.";
+                         $smsService->sendSms($action->responsibleMember->telephone, $message);
+                     }
+                }
+            } catch (\Exception $e) {
+                \Log::error('Failed to send minutes SMS: ' . $e->getMessage());
+                // Don't fail the request if SMS fails
+            }
+
             return response()->json([
                 'status' => 200,
                 'message' => 'Minute created successfully',

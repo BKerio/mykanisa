@@ -4,6 +4,7 @@ import 'package:pcea_church/screen/create_minutes.dart';
 import 'package:pcea_church/screen/member_messages.dart';
 import 'package:pcea_church/screen/members.dart';
 import 'package:pcea_church/screen/view_events.dart';
+import 'package:pcea_church/screen/minutes_history.dart';
 
 class SecretaryDashboard extends BaseDashboard {
   const SecretaryDashboard({super.key});
@@ -33,13 +34,13 @@ class SecretaryDashboard extends BaseDashboard {
 
       DashboardCard(
         icon: Icons.event_note,
-        title: 'Minutes',
+        title: 'Manage Minutes',
         color: Colors.teal,
-        subtitle: 'Meeting minutes',
+        subtitle: 'History & Create',
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => MinutesPage()),
+            MaterialPageRoute(builder: (context) => MinutesHistoryPage()),
           );
         },
       ),

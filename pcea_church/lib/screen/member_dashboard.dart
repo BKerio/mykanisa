@@ -8,6 +8,7 @@ import 'package:pcea_church/screen/pledges.dart';
 import 'package:pcea_church/screen/view_events.dart';
 import 'package:pcea_church/screen/member_group_leader_message.dart';
 import 'package:pcea_church/screen/all_church_groups.dart';
+import 'package:pcea_church/screen/minutes_history.dart';
 
 class MemberDashboard extends BaseDashboard {
   const MemberDashboard({super.key});
@@ -120,6 +121,23 @@ class MemberDashboard extends BaseDashboard {
             context,
             MaterialPageRoute(
               builder: (context) => const AllChurchGroupsScreen(),
+            ),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.event_note,
+        title: 'My Minutes',
+        color: Colors.teal,
+        subtitle: 'View meeting minutes',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+               builder: (context) => MinutesHistoryPage(
+                 apiPath: '/minutes/mine',
+                 canCreate: false, // Members cannot create minutes
+               ),
             ),
           );
         },

@@ -4,9 +4,19 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
-import 'view_minute.dart';
+import 'package:pcea_church/screen/create_minutes.dart';
+import 'package:pcea_church/screen/view_minute.dart';
 
 class MinutesHistoryPage extends StatefulWidget {
+  final String apiPath;
+  final bool canCreate;
+  
+  const MinutesHistoryPage({
+    super.key, 
+    this.apiPath = '/secretary/minutes',
+    this.canCreate = true,
+  });
+
   @override
   _MinutesHistoryPageState createState() => _MinutesHistoryPageState();
 }
@@ -14,7 +24,7 @@ class MinutesHistoryPage extends StatefulWidget {
 class _MinutesHistoryPageState extends State<MinutesHistoryPage> {
   final Color _brand = const Color(0xFF0A1F44);
   final Color _lightBrand = const Color(0xFF193D71);
-  
+
   bool _loading = true;
   String? _error;
   List<dynamic> _minutes = [];
@@ -33,7 +43,7 @@ class _MinutesHistoryPageState extends State<MinutesHistoryPage> {
     });
 
     try {
-      final uri = Uri.parse('${Config.baseUrl}/secretary/minutes');
+      final uri = Uri.parse('${Config.baseUrl}${widget.apiPath}');
       final response = await API().getRequest(url: uri);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -46,10 +56,12 @@ class _MinutesHistoryPageState extends State<MinutesHistoryPage> {
         throw Exception('Failed to load minutes');
       }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -103,51 +115,68 @@ class _MinutesHistoryPageState extends State<MinutesHistoryPage> {
             child: _loading
                 ? Center(child: SpinKitThreeBounce(color: _brand, size: 30))
                 : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: 60, color: Colors.red),
-                            SizedBox(height: 16),
-                            Text('Error: $_error'),
-                            SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadMinutes,
-                              child: Text('Retry'),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 60, color: Colors.red),
+                        SizedBox(height: 16),
+                        Text('Error: $_error'),
+                        SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadMinutes,
+                          child: Text('Retry'),
                         ),
-                      )
-                    : _filteredMinutes.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.description_outlined, size: 80, color: Colors.grey),
-                                SizedBox(height: 16),
-                                Text(
-                                  _searchQuery.isEmpty
-                                      ? 'No minutes recorded yet'
-                                      : 'No matching minutes found',
-                                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                          )
-                        : RefreshIndicator(
-                            onRefresh: _loadMinutes,
-                            child: ListView.builder(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              itemCount: _filteredMinutes.length,
-                              itemBuilder: (context, index) {
-                                final minute = _filteredMinutes[index];
-                                return _buildMinuteCard(minute);
-                              },
-                            ),
-                          ),
+                      ],
+                    ),
+                  )
+                : _filteredMinutes.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.description_outlined,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          _searchQuery.isEmpty
+                              ? 'No minutes recorded yet'
+                              : 'No matching minutes found',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadMinutes,
+                    child: ListView.builder(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _filteredMinutes.length,
+                      itemBuilder: (context, index) {
+                        final minute = _filteredMinutes[index];
+                        return _buildMinuteCard(minute);
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
+      floatingActionButton: widget.canCreate ? FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => MinutesPage()),
+          );
+          if (result == true) _loadMinutes();
+        },
+        label: Text('New Minutes'),
+        icon: Icon(Icons.add),
+        backgroundColor: _brand,
+        foregroundColor: Colors.white,
+      ) : null,
     );
   }
 
@@ -166,15 +195,16 @@ class _MinutesHistoryPageState extends State<MinutesHistoryPage> {
     return Card(
       elevation: 3,
       margin: EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () async {
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ViewMinutePage(minuteId: minute['id']),
+              builder: (context) => ViewMinutePage(
+                minuteId: minute['id'],
+                canEdit: widget.canCreate,
+              ),
             ),
           );
           if (result == true) _loadMinutes(); // Reload if edited
@@ -251,10 +281,7 @@ class _MinutesHistoryPageState extends State<MinutesHistoryPage> {
             color: _brand,
           ),
         ),
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, color: Colors.grey),
-        ),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }

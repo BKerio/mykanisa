@@ -84,18 +84,57 @@ class MinutesController extends Controller
     public function mine(Request $request)
     {
         $user = $request->user();
+        // user table (users) vs members table. 
+        // Assuming user->email links to member->email or there is a link.
+        // User model usually has 'member_id' or we lookup by email.
+        // Based on existing code: Member::where('email', $user?->email)->first();
+        
         $member = Member::where('email', $user?->email)->first();
+        if (!$member) {
+            return response()->json(['status' => 404, 'message' => 'Member record not found'], 404);
+        }
+
+        // Get minutes where member is attendee (present or apology)
+        $minutes = Minute::with(['creator', 'attendees.member', 'agendaItems', 'actionItems'])
+            ->whereHas('attendees', function ($q) use ($member) {
+                $q->where('member_id', $member->id)
+                  ->whereIn('status', ['present', 'absent_with_apology']);
+            })
+            ->orderBy('meeting_date', 'desc')
+            ->orderBy('meeting_time', 'desc')
+            ->paginate(15);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'My minutes retrieved successfully',
+            'data' => $minutes,
+        ]);
+    }
+
+    public function show($id)
+    {
+        $user = request()->user();
+        $member = Member::where('email', $user?->email)->first();
+        
         if (!$member) {
             return response()->json(['status' => 404, 'message' => 'Member not found'], 404);
         }
 
-        $minutes = Minute::whereHas('attendees', function ($q) use ($member) {
-            $q->where('member_id', $member->id);
-        })->orderByDesc('meeting_date')->paginate(20);
+        $minute = Minute::with(['creator', 'attendees.member', 'agendaItems', 'actionItems.responsibleMember'])
+            ->where('id', $id)
+            ->whereHas('attendees', function ($q) use ($member) {
+                $q->where('member_id', $member->id)
+                  ->whereIn('status', ['present', 'absent_with_apology']);
+            })
+            ->first();
+
+        if (!$minute) {
+            return response()->json(['status' => 403, 'message' => 'Unauthorized or Minute not found'], 403);
+        }
 
         return response()->json([
             'status' => 200,
-            'minutes' => $minutes,
+            'data' => $minute,
         ]);
     }
 }

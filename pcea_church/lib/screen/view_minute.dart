@@ -4,12 +4,16 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:pcea_church/config/server.dart';
 import 'package:pcea_church/method/api.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'create_minutes.dart';
 
 class ViewMinutePage extends StatefulWidget {
   final int minuteId;
+  final bool canEdit;
 
-  const ViewMinutePage({required this.minuteId});
+  const ViewMinutePage({required this.minuteId, this.canEdit = true});
 
   @override
   _ViewMinutePageState createState() => _ViewMinutePageState();
@@ -36,7 +40,8 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
     });
 
     try {
-      final uri = Uri.parse('${Config.baseUrl}/secretary/minutes/${widget.minuteId}');
+      final endpoint = widget.canEdit ? '/secretary/minutes' : '/minutes';
+      final uri = Uri.parse('${Config.baseUrl}$endpoint/${widget.minuteId}');
       final response = await API().getRequest(url: uri);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -97,7 +102,181 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
     }
   }
 
-  @override
+  Future<void> _generatePdf() async {
+    final pdf = pw.Document();
+    
+    // Extract data
+    final title = _minute!['title'] ?? 'Untitled';
+    final date = _minute!['meeting_date'] ?? '';
+    final time = _minute!['meeting_time'] ?? '';
+    final location = _minute!['location'] ?? 'N/A';
+    final type = _minute!['meeting_type'] ?? 'N/A';
+    
+    final attendees = (_minute!['attendees'] as List?) ?? [];
+    final agendaItems = (_minute!['agenda_items'] as List?) ?? [];
+    final actionItems = (_minute!['action_items'] as List?) ?? [];
+    final summary = _minute!['summary'] ?? '';
+    final notes = _minute!['notes'] ?? '';
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return [
+            // Header
+            pw.Header(
+              level: 0,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('PCEA CHURCH', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 10),
+                  pw.Text('MEETING MINUTES', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Divider(),
+                ],
+              ),
+            ),
+            
+            // Meeting Info
+            pw.Container(
+              padding: pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey),
+                borderRadius: pw.BorderRadius.circular(5),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Title: $title', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Date: $date'),
+                      pw.Text('Time: $time'),
+                    ],
+                  ),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Location: $location'),
+                      pw.Text('Type: $type'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 20),
+
+            // Attendance
+            pw.Text('ATTENDANCE', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 5),
+            if (attendees.isNotEmpty)
+              _buildPdfAttendanceList(attendees)
+            else
+              pw.Text('No attendees recorded'),
+            pw.SizedBox(height: 20),
+
+            // Agenda
+            pw.Text('AGENDA', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 5),
+            ...agendaItems.asMap().entries.map((e) {
+              return pw.Bullet(text: '${e.value['title'] ?? ''}');
+            }),
+            pw.SizedBox(height: 20),
+
+            // Action Items
+            pw.Text('ACTION ITEMS', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 5),
+            if (actionItems.isNotEmpty)
+              pw.Table.fromTextArray(
+                context: context,
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                headers: ['Task', 'Responsible', 'Due Date', 'Status'],
+                data: actionItems.map((item) => [
+                  item['description'] ?? '',
+                  item['responsible_member']?['name'] ?? 'Unassigned',
+                  item['due_date'] ?? '',
+                  item['status'] ?? ''
+                ]).toList(),
+              )
+            else
+              pw.Text('No action items'),
+            pw.SizedBox(height: 20),
+            
+            // Discussion/Summary
+            pw.Text('MINUTES / SUMMARY', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.Divider(),
+            pw.Text(summary.isNotEmpty ? summary : 'No summary provided'),
+            pw.SizedBox(height: 20),
+            
+            if (notes.isNotEmpty) ...[
+               pw.Text('GENERAL NOTES', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+               pw.Text(notes),
+            ],
+            
+            // Footer
+            pw.SizedBox(height: 40),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(children: [
+                  pw.Container(width: 150, height: 1, color: PdfColors.black),
+                  pw.SizedBox(height: 5),
+                  pw.Text('Secretary Signature'),
+                ]),
+                pw.Column(children: [
+                  pw.Container(width: 150, height: 1, color: PdfColors.black),
+                  pw.SizedBox(height: 5),
+                  pw.Text('Chairman Signature'),
+                ]),
+              ],
+            ),
+          ];
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Minutes_${title.replaceAll(' ', '_')}.pdf',
+    );
+  }
+
+  pw.Widget _buildPdfAttendanceList(List attendees) {
+    // Group attendees
+    final present = attendees.where((a) => a['status'] == 'present').toList();
+    final apology = attendees.where((a) => a['status'] == 'absent_with_apology').toList();
+    final absent = attendees.where((a) => a['status'] == 'absent_without_apology').toList();
+    
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        if (present.isNotEmpty) ...[
+          pw.Text('Present (${present.length}):', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+          pw.Wrap(
+            spacing: 5,
+            children: present.map((a) => pw.Text('${a['member']['name'] ?? ''},')).toList(),
+          ),
+          pw.SizedBox(height: 5),
+        ],
+        if (apology.isNotEmpty) ...[
+          pw.Text('Apologies (${apology.length}):', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+          pw.Wrap(
+            spacing: 5,
+            children: apology.map((a) => pw.Text('${a['member']['name'] ?? ''},')).toList(),
+          ),
+          pw.SizedBox(height: 5),
+        ],
+        if (absent.isNotEmpty) ...[
+          pw.Text('Absent (${absent.length}):', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+           pw.Wrap(
+            spacing: 5,
+            children: absent.map((a) => pw.Text('${a['member']['name'] ?? ''},')).toList(),
+          ),
+        ],
+      ],
+    );
+  }
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -108,25 +287,32 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
         actions: [
           if (_minute != null) ...[
             IconButton(
-              icon: Icon(Icons.edit),
-              onPressed: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MinutesPage(editMinute: _minute),
-                  ),
-                );
-                if (result == true) {
-                  _loadMinute(); // Reload after edit
-                }
-              },
-              tooltip: 'Edit',
+              icon: Icon(Icons.picture_as_pdf),
+              onPressed: _generatePdf,
+              tooltip: 'Export PDF',
             ),
-            IconButton(
-              icon: Icon(Icons.delete),
-              onPressed: _deleteMinute,
-              tooltip: 'Delete',
-            ),
+            if (widget.canEdit) ...[
+              IconButton(
+                icon: Icon(Icons.edit),
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MinutesPage(editMinute: _minute),
+                    ),
+                  );
+                  if (result == true) {
+                    _loadMinute(); // Reload after edit
+                  }
+                },
+                tooltip: 'Edit',
+              ),
+              IconButton(
+                icon: Icon(Icons.delete),
+                onPressed: _deleteMinute,
+                tooltip: 'Delete',
+              ),
+            ],
           ],
         ],
       ),

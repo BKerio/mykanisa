@@ -359,6 +359,7 @@ Route::middleware(['auth:sanctum', 'role:secretary'])->group(function(){
 Route::middleware('auth:sanctum')->group(function(){
     Route::post('/minutes', [\App\Http\Controllers\MinutesController::class, 'store']);
     Route::get('/minutes/mine', [\App\Http\Controllers\MinutesController::class, 'mine']);
+    Route::get('/minutes/{id}', [\App\Http\Controllers\MinutesController::class, 'show']);
 });
 
 // Treasurer routes
