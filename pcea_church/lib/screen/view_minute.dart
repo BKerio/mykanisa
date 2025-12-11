@@ -62,36 +62,158 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
   }
 
   Future<void> _deleteMinute() async {
-    final confirm = await showDialog<bool>(
+    const Color primaryColor = Color(0xFF0A1F44);
+
+    final confirm = await showGeneralDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete Minute?'),
-        content: Text('Are you sure you want to permanently delete this minute?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.35),
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const SizedBox.shrink(),
+      transitionBuilder: (context, animation, _, __) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+        );
+
+        return ScaleTransition(
+          scale: curved,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 26),
+              padding: const EdgeInsets.fromLTRB(26, 22, 26, 18),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.94),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.5),
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    offset: const Offset(0, 6),
+                    blurRadius: 22,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.red.withOpacity(0.12),
+                    ),
+                    child: Icon(
+                      Icons.delete_forever_rounded,
+                      color: Colors.red.shade400,
+                      size: 40,
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Text(
+                    'Delete Minute',
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                      color: primaryColor,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  const Text(
+                    'Are you sure you want to permanently delete this minute?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                      height: 1.35,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+
+                  const SizedBox(height: 26),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text(
+                            'Not now',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 6,
+                            shadowColor: Color(0xFF0A1F44).withOpacity(0.25),
+                            backgroundColor: Color(0xFF0A1F44),
+                          ),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text('Delete'),
-          ),
-        ],
-      ),
+        );
+      },
     );
 
     if (confirm != true) return;
 
     try {
-      final uri = Uri.parse('${Config.baseUrl}/secretary/minutes/${widget.minuteId}');
+      final uri = Uri.parse(
+        '${Config.baseUrl}/secretary/minutes/${widget.minuteId}',
+      );
+
       final response = await API().deleteRequest(url: uri);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Minute deleted successfully')),
+          const SnackBar(content: Text('Minute deleted successfully')),
         );
-        Navigator.pop(context, true); // Return true to indicate deletion
+        Navigator.pop(context, true);
       } else {
         throw Exception('Failed to delete minute');
       }
@@ -104,14 +226,17 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
 
   Future<void> _generatePdf() async {
     final pdf = pw.Document();
-    
+
+    // Load Logo
+    final logoImage = await imageFromAssetBundle('assets/icon.png');
+
     // Extract data
     final title = _minute!['title'] ?? 'Untitled';
     final date = _minute!['meeting_date'] ?? '';
     final time = _minute!['meeting_time'] ?? '';
     final location = _minute!['location'] ?? 'N/A';
     final type = _minute!['meeting_type'] ?? 'N/A';
-    
+
     final attendees = (_minute!['attendees'] as List?) ?? [];
     final agendaItems = (_minute!['agenda_items'] as List?) ?? [];
     final actionItems = (_minute!['action_items'] as List?) ?? [];
@@ -120,23 +245,59 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
 
     pdf.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          buildBackground: (context) => pw.FullPage(
+            ignoreMargins: true,
+            child: pw.Opacity(
+              opacity: 0.08,
+              child: pw.Center(child: pw.Image(logoImage)),
+            ),
+          ),
+        ),
         build: (pw.Context context) {
           return [
             // Header
             pw.Header(
               level: 0,
               child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('PCEA CHURCH', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 10),
-                  pw.Text('MEETING MINUTES', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'PCEA SGM CHURCH',
+                            style: pw.TextStyle(
+                              fontSize: 24,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.SizedBox(height: 10),
+                          pw.Text(
+                            'MEETING MINUTES',
+                            style: pw.TextStyle(
+                              fontSize: 18,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      pw.Container(
+                        height: 60,
+                        width: 60,
+                        child: pw.Image(logoImage),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 5),
                   pw.Divider(),
                 ],
               ),
             ),
-            
+
             // Meeting Info
             pw.Container(
               padding: pw.EdgeInsets.all(10),
@@ -147,14 +308,16 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('Title: $title', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    'Title: $title',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.SizedBox(height: 5),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text('Date: $date'),
-                      pw.Text('Time: $time'),
-                    ],
+                    children: [pw.Text('Date: $date'), pw.Text('Time: $time')],
                   ),
+                  pw.SizedBox(height: 5),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
@@ -168,7 +331,10 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
             pw.SizedBox(height: 20),
 
             // Attendance
-            pw.Text('ATTENDANCE', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'ATTENDANCE',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 5),
             if (attendees.isNotEmpty)
               _buildPdfAttendanceList(attendees)
@@ -177,7 +343,10 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
             pw.SizedBox(height: 20),
 
             // Agenda
-            pw.Text('AGENDA', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'AGENDA',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 5),
             ...agendaItems.asMap().entries.map((e) {
               return pw.Bullet(text: '${e.value['title'] ?? ''}');
@@ -185,50 +354,70 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
             pw.SizedBox(height: 20),
 
             // Action Items
-            pw.Text('ACTION ITEMS', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'ACTION ITEMS',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 5),
             if (actionItems.isNotEmpty)
               pw.Table.fromTextArray(
                 context: context,
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 headers: ['Task', 'Responsible', 'Due Date', 'Status'],
-                data: actionItems.map((item) => [
-                  item['description'] ?? '',
-                  item['responsible_member']?['name'] ?? 'Unassigned',
-                  item['due_date'] ?? '',
-                  item['status'] ?? ''
-                ]).toList(),
+                data: actionItems
+                    .map(
+                      (item) => [
+                        item['description'] ?? '',
+                        item['responsible_member']?['name'] ?? 'Unassigned',
+                        item['due_date'] ?? '',
+                        item['status'] ?? '',
+                      ],
+                    )
+                    .toList(),
               )
             else
               pw.Text('No action items'),
             pw.SizedBox(height: 20),
-            
+
             // Discussion/Summary
-            pw.Text('MINUTES / SUMMARY', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'MINUTES / SUMMARY',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
             pw.Divider(),
             pw.Text(summary.isNotEmpty ? summary : 'No summary provided'),
             pw.SizedBox(height: 20),
-            
+
             if (notes.isNotEmpty) ...[
-               pw.Text('GENERAL NOTES', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-               pw.Text(notes),
+              pw.Text(
+                'GENERAL NOTES',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.Text(notes),
             ],
-            
+
             // Footer
             pw.SizedBox(height: 40),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Column(children: [
-                  pw.Container(width: 150, height: 1, color: PdfColors.black),
-                  pw.SizedBox(height: 5),
-                  pw.Text('Secretary Signature'),
-                ]),
-                pw.Column(children: [
-                  pw.Container(width: 150, height: 1, color: PdfColors.black),
-                  pw.SizedBox(height: 5),
-                  pw.Text('Chairman Signature'),
-                ]),
+                pw.Column(
+                  children: [
+                    pw.Container(width: 150, height: 1, color: PdfColors.black),
+                    pw.SizedBox(height: 5),
+                    pw.Text('Secretary Signature'),
+                  ],
+                ),
+                pw.Column(
+                  children: [
+                    pw.Container(width: 150, height: 1, color: PdfColors.black),
+                    pw.SizedBox(height: 5),
+                    pw.Text('Chairman Signature'),
+                  ],
+                ),
               ],
             ),
           ];
@@ -245,42 +434,65 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
   pw.Widget _buildPdfAttendanceList(List attendees) {
     // Group attendees
     final present = attendees.where((a) => a['status'] == 'present').toList();
-    final apology = attendees.where((a) => a['status'] == 'absent_with_apology').toList();
-    final absent = attendees.where((a) => a['status'] == 'absent_without_apology').toList();
-    
+    final apology = attendees
+        .where((a) => a['status'] == 'absent_with_apology')
+        .toList();
+    final absent = attendees
+        .where((a) => a['status'] == 'absent_without_apology')
+        .toList();
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         if (present.isNotEmpty) ...[
-          pw.Text('Present (${present.length}):', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+          pw.Text(
+            'Present (${present.length}):',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+          ),
           pw.Wrap(
             spacing: 5,
-            children: present.map((a) => pw.Text('${a['member']['name'] ?? ''},')).toList(),
+            children: present
+                .map((a) => pw.Text('${a['member']['name'] ?? ''},'))
+                .toList(),
           ),
           pw.SizedBox(height: 5),
         ],
         if (apology.isNotEmpty) ...[
-          pw.Text('Apologies (${apology.length}):', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+          pw.Text(
+            'Apologies (${apology.length}):',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+          ),
           pw.Wrap(
             spacing: 5,
-            children: apology.map((a) => pw.Text('${a['member']['name'] ?? ''},')).toList(),
+            children: apology
+                .map((a) => pw.Text('${a['member']['name'] ?? ''},'))
+                .toList(),
           ),
           pw.SizedBox(height: 5),
         ],
         if (absent.isNotEmpty) ...[
-          pw.Text('Absent (${absent.length}):', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-           pw.Wrap(
+          pw.Text(
+            'Absent (${absent.length}):',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+          ),
+          pw.Wrap(
             spacing: 5,
-            children: absent.map((a) => pw.Text('${a['member']['name'] ?? ''},')).toList(),
+            children: absent
+                .map((a) => pw.Text('${a['member']['name'] ?? ''},'))
+                .toList(),
           ),
         ],
       ],
     );
   }
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Minute Details', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          'Minute Details',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: _brand,
         foregroundColor: Colors.white,
         centerTitle: true,
@@ -319,40 +531,37 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
       body: _loading
           ? Center(child: SpinKitThreeBounce(color: _brand, size: 30))
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, size: 60, color: Colors.red),
-                      SizedBox(height: 16),
-                      Text('Error: $_error'),
-                      SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadMinute,
-                        child: Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      SizedBox(height: 20),
-                      _buildSection('Attendance', _buildAttendance()),
-                      SizedBox(height: 20),
-                      _buildSection('Agenda Items', _buildAgenda()),
-                      SizedBox(height: 20),
-                      _buildSection('Action Items', _buildActions()),
-                      SizedBox(height: 20),
-                      _buildSection('Notes', _buildNotes()),
-                      SizedBox(height: 20),
-                      _buildSection('Summary', _buildSummary()),
-                    ],
-                  ),
-                ),
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 60, color: Colors.red),
+                  SizedBox(height: 16),
+                  Text('Error: $_error'),
+                  SizedBox(height: 16),
+                  ElevatedButton(onPressed: _loadMinute, child: Text('Retry')),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  SizedBox(height: 20),
+                  _buildSection('Attendance', _buildAttendance()),
+                  SizedBox(height: 20),
+                  _buildSection('Agenda Items', _buildAgenda()),
+                  SizedBox(height: 20),
+                  _buildSection('Action Items', _buildActions()),
+                  SizedBox(height: 20),
+                  _buildSection('Notes', _buildNotes()),
+                  SizedBox(height: 20),
+                  _buildSection('Summary', _buildSummary()),
+                ],
+              ),
+            ),
     );
   }
 
@@ -405,10 +614,7 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
         children: [
           Icon(icon, size: 18, color: _lightBrand),
           SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
+          Text('$label: ', style: TextStyle(fontWeight: FontWeight.bold)),
           Expanded(child: Text(value)),
         ],
       ),
@@ -439,15 +645,22 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
     if (attendees.isEmpty) return Text('No attendees recorded');
 
     final present = attendees.where((a) => a['status'] == 'present').toList();
-    final apology = attendees.where((a) => a['status'] == 'absent_with_apology').toList();
-    final absent = attendees.where((a) => a['status'] == 'absent_without_apology').toList();
+    final apology = attendees
+        .where((a) => a['status'] == 'absent_with_apology')
+        .toList();
+    final absent = attendees
+        .where((a) => a['status'] == 'absent_without_apology')
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (present.isNotEmpty) _buildAttendanceGroup('Present', present, Colors.green),
-        if (apology.isNotEmpty) _buildAttendanceGroup('With Apology', apology, Colors.orange),
-        if (absent.isNotEmpty) _buildAttendanceGroup('Absent', absent, Colors.red),
+        if (present.isNotEmpty)
+          _buildAttendanceGroup('Present', present, Colors.green),
+        if (apology.isNotEmpty)
+          _buildAttendanceGroup('With Apology', apology, Colors.orange),
+        if (absent.isNotEmpty)
+          _buildAttendanceGroup('Absent', absent, Colors.red),
       ],
     );
   }
@@ -461,10 +674,14 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
           style: TextStyle(fontWeight: FontWeight.bold, color: color),
         ),
         SizedBox(height: 4),
-        ...attendees.map((a) => Padding(
-              padding: EdgeInsets.only(left: 16, bottom: 4),
-              child: Text('• ${a['member']['name'] ?? 'Unknown'} (${a['member']['role'] ?? 'Member'})'),
-            )),
+        ...attendees.map(
+          (a) => Padding(
+            padding: EdgeInsets.only(left: 16, bottom: 4),
+            child: Text(
+              '• ${a['member']['name'] ?? 'Unknown'} (${a['member']['role'] ?? 'Member'})',
+            ),
+          ),
+        ),
         SizedBox(height: 12),
       ],
     );
@@ -489,9 +706,13 @@ class _ViewMinutePageState extends State<ViewMinutePage> {
                   '$index. ${item['title'] ?? 'Untitled'}',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                if (item['notes'] != null && item['notes'].toString().isNotEmpty) ...[
+                if (item['notes'] != null &&
+                    item['notes'].toString().isNotEmpty) ...[
                   SizedBox(height: 4),
-                  Text(item['notes'], style: TextStyle(color: Colors.grey[700])),
+                  Text(
+                    item['notes'],
+                    style: TextStyle(color: Colors.grey[700]),
+                  ),
                 ],
               ],
             ),
