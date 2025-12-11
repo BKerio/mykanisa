@@ -92,6 +92,10 @@ class API {
   }) async {
     final request = http.MultipartRequest('POST', url);
     request.fields.addAll(fields);
+    
+    // Add Accept header to ensure JSON response
+    request.headers['Accept'] = 'application/json';
+    
     if (requireAuth) {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
@@ -100,6 +104,32 @@ class API {
       }
     }
     request.files.add(await http.MultipartFile.fromPath(fileField, filePath));
+    return request.send();
+  }
+
+  Future<http.StreamedResponse> uploadMultipartWithFiles({
+    required Uri url,
+    required Map<String, String> fields,
+    required List<http.MultipartFile> files,
+    bool requireAuth = true,
+  }) async {
+    final request = http.MultipartRequest('POST', url);
+    request.fields.addAll(fields);
+    
+    // Add Accept header to ensure JSON response
+    request.headers['Accept'] = 'application/json';
+    
+    if (requireAuth) {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+    }
+    
+    // Add all files to the request
+    request.files.addAll(files);
+    
     return request.send();
   }
 }

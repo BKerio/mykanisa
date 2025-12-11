@@ -348,6 +348,7 @@ Route::middleware(['auth:sanctum', 'role:secretary'])->group(function(){
         // Minutes routes
         Route::get('/minutes', [\App\Http\Controllers\Secretary\MinutesController::class, 'index']);
         Route::post('/minutes', [\App\Http\Controllers\Secretary\MinutesController::class, 'store']);
+        Route::post('/minutes/upload', [\App\Http\Controllers\Secretary\MinutesController::class, 'uploadFile']);
         Route::get('/minutes/{id}', [\App\Http\Controllers\Secretary\MinutesController::class, 'show']);
         Route::put('/minutes/{id}', [\App\Http\Controllers\Secretary\MinutesController::class, 'update']);
         Route::delete('/minutes/{id}', [\App\Http\Controllers\Secretary\MinutesController::class, 'destroy']);

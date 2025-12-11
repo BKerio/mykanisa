@@ -37,13 +37,24 @@ class MinutesController extends Controller
      */
     public function store(Request $request)
     {
+        // Decode JSON strings from multipart form data
+        if ($request->has('attendees') && is_string($request->input('attendees'))) {
+            $request->merge(['attendees' => json_decode($request->input('attendees'), true)]);
+        }
+        if ($request->has('agenda_items') && is_string($request->input('agenda_items'))) {
+            $request->merge(['agenda_items' => json_decode($request->input('agenda_items'), true)]);
+        }
+        if ($request->has('action_items') && is_string($request->input('action_items'))) {
+            $request->merge(['action_items' => json_decode($request->input('action_items'), true)]);
+        }
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'meeting_date' => 'required|date',
             'meeting_time' => 'required',
             'meeting_type' => 'required|in:Virtual,Physical,Hybrid',
             'location' => 'nullable|string|max:255',
-            'is_online' => 'boolean',
+            'is_online' => 'nullable|boolean',
             'online_link' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'summary' => 'nullable|string',
@@ -230,6 +241,51 @@ class MinutesController extends Controller
             return response()->json([
                 'status' => 500,
                 'message' => 'Failed to delete minute: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload file for minute attachment
+     */
+    public function uploadFile(Request $request)
+    {
+        $validated = $request->validate([
+            'file' => 'required|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,txt',
+            'type' => 'required|in:agenda,action',
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $type = $validated['type'];
+            
+            // Generate unique filename
+            $originalName = $file->getClientOriginalName();
+            $extension = $file->getClientOriginalExtension();
+            $filename = time() . '_' . uniqid() . '.' . $extension;
+            
+            // Store file in public/minutes/{type} directory
+            $path = $file->storeAs("public/minutes/{$type}", $filename);
+            
+            // Get public URL
+            $url = str_replace('public/', 'storage/', $path);
+            
+            return response()->json([
+                'status' => 200,
+                'message' => 'File uploaded successfully',
+                'data' => [
+                    'filename' => $originalName,
+                    'stored_name' => $filename,
+                    'path' => $url,
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Failed to upload file: ' . $e->getMessage(),
             ], 500);
         }
     }

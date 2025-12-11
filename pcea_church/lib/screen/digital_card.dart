@@ -348,7 +348,7 @@ class _DigitalCardScreenState extends State<DigitalCardScreen> {
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.green.withOpacity(0.05),
               ),
             ),
           ),
