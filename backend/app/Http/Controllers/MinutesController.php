@@ -97,9 +97,14 @@ class MinutesController extends Controller
 
         // Get minutes where member is attendee (present or apology)
         $minutes = Minute::with(['creator', 'attendees.member', 'agendaItems', 'actionItems'])
-            ->whereHas('attendees', function ($q) use ($member) {
-                $q->where('member_id', $member->id)
-                  ->whereIn('status', ['present', 'absent_with_apology']);
+            ->where(function($query) use ($member) {
+                $query->whereHas('attendees', function ($q) use ($member) {
+                    $q->where('member_id', $member->id)
+                      ->whereIn('status', ['present', 'absent_with_apology']);
+                })
+                ->orWhereHas('actionItems', function ($q) use ($member) {
+                    $q->where('responsible_member_id', $member->id);
+                });
             })
             ->orderBy('meeting_date', 'desc')
             ->orderBy('meeting_time', 'desc')
@@ -123,9 +128,14 @@ class MinutesController extends Controller
 
         $minute = Minute::with(['creator', 'attendees.member', 'agendaItems', 'actionItems.responsibleMember'])
             ->where('id', $id)
-            ->whereHas('attendees', function ($q) use ($member) {
-                $q->where('member_id', $member->id)
-                  ->whereIn('status', ['present', 'absent_with_apology']);
+            ->where(function($query) use ($member) {
+                $query->whereHas('attendees', function ($q) use ($member) {
+                    $q->where('member_id', $member->id)
+                      ->whereIn('status', ['present', 'absent_with_apology']);
+                })
+                ->orWhereHas('actionItems', function ($q) use ($member) {
+                    $q->where('responsible_member_id', $member->id);
+                });
             })
             ->first();
 
@@ -202,6 +212,31 @@ class MinutesController extends Controller
         $item->status = $status;
         $item->status_reason = $reason;
         $item->save();
+
+        // Notify Secretary (Minute Creator)
+        try {
+            $minute = $item->minute;
+            $minute = $item->minute;
+            $minute->load('creator');
+            $secretary = $minute->creator;
+
+            if ($secretary && $secretary->telephone) {
+                $updaterName = $member->full_name ?? $member->name ?? 'A member';
+                $desc = $item->description ?? 'Task';
+                $shortDesc = strlen($desc) > 25 ? substr($desc, 0, 25) . '...' : $desc;
+                
+                $msg = "Task Update: $updaterName updated '$shortDesc' to '$status'.";
+                if (!empty($item->status_reason)) {
+                    $cleanReason = str_replace('[Cannot Manage] ', '', $item->status_reason);
+                    $msg .= " Note: $cleanReason";
+                }
+
+                $smsService = new \App\Services\SmsService();
+                $smsService->sendSms($secretary->telephone, $msg);
+            }
+        } catch (\Exception $e) {
+            \Log::error("Failed to notify secretary: " . $e->getMessage());
+        }
 
         return response()->json(['status' => 200, 'message' => 'Task updated successfully']);
     }
