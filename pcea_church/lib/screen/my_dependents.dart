@@ -75,7 +75,9 @@ class _DependentFormScreenState extends State<DependentFormScreen> {
 
       final response = _isEditing
           ? await API().putRequest(
-              url: Uri.parse('${Config.baseUrl}/members/dependents/${widget.dependent!.id}'),
+              url: Uri.parse(
+                '${Config.baseUrl}/members/dependents/${widget.dependent!.id}',
+              ),
               data: data,
             )
           : await API().postRequest(
@@ -107,9 +109,9 @@ class _DependentFormScreenState extends State<DependentFormScreen> {
         }
       }
     } catch (e) {
-        if (mounted) {
-          API.showSnack(context, 'Error: $e', success: false);
-        }
+      if (mounted) {
+        API.showSnack(context, 'Error: $e', success: false);
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -120,20 +122,14 @@ class _DependentFormScreenState extends State<DependentFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(_isEditing ? 'Edit Dependent' : 'Add Dependent'),
-        backgroundColor: Colors.grey.shade100,
-        foregroundColor: Colors.black87,
+        backgroundColor: Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.grey.shade200, Colors.white],
-          ),
-        ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Container(

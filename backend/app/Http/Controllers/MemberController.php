@@ -111,7 +111,7 @@ class MemberController extends Controller
                 'profile_image' => $profileImagePath,
             ]);
 
-            foreach (($validated['dependencies'] ?? []) as $dep) {
+            foreach (($validated['dependencies'] ?? []) as $index => $dep) {
                 // Prevent duplicates for THIS member only
                 $query = Dependency::where('member_id', $member->id);
                 if (!empty($dep['birth_cert_number'])) {
@@ -125,6 +125,24 @@ class MemberController extends Controller
                     continue; // skip duplicates for this member
                 }
 
+                // Handle dependent photos
+                $depPhotos = [];
+                // Frontend sends dependent_photos_{index}[]
+                if ($request->hasFile("dependent_photos_{$index}")) {
+                    $files = $request->file("dependent_photos_{$index}");
+                    // Ensure max 3
+                    $files = is_array($files) ? array_slice($files, 0, 3) : [$files]; 
+                    
+                    foreach ($files as $file) {
+                        try {
+                            $path = $file->store('dependents', 'public');
+                            $depPhotos[] = $path;
+                        } catch (\Exception $e) {
+                            Log::error("Failed to upload photo for dependent index {$index}", ['error' => $e->getMessage()]);
+                        }
+                    }
+                }
+
                 Dependency::create([
                     'member_id' => $member->id,
                     'name' => $dep['name'],
@@ -133,6 +151,7 @@ class MemberController extends Controller
                     'is_baptized' => (bool)($dep['is_baptized'] ?? false),
                     'takes_holy_communion' => (bool)($dep['takes_holy_communion'] ?? false),
                     'school' => $dep['school'] ?? null,
+                    'photos' => $depPhotos,
                 ]);
             }
 

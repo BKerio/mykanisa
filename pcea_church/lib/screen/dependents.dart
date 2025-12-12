@@ -119,10 +119,10 @@ class _DependentsScreenState extends State<DependentsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: const Color(0xFF0A1F44),
       appBar: AppBar(
         title: const Text(
-          'My Dependents',
+          'My Dependentsl',
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
         ),
         backgroundColor: Color(0xFF0A1F44),
@@ -265,7 +265,7 @@ class _DependentsScreenState extends State<DependentsScreen> {
           vertical: 16,
         ),
         leading: CircleAvatar(
-          radius: 28,
+          radius: 40,
           backgroundColor: Colors.teal.shade100,
           child: Text(
             dependent.name[0].toUpperCase(),
@@ -302,9 +302,9 @@ class _DependentsScreenState extends State<DependentsScreen> {
           ),
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.edit, color: Colors.teal),
+          icon: const Icon(Icons.edit, color: Color(0xFF0A1F44)),
           onPressed: () => _navigateToEditDependent(dependent),
-          tooltip: 'Edit Dependent',
+          tooltip: 'Update Dependent Details',
         ),
         onTap: () => _showDependentDetails(dependent),
       ),

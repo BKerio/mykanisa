@@ -36,10 +36,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> sendResetCode() async {
     final identifier = identifierController.text.trim();
     if (identifier.isEmpty) {
-      API.showSnack(
-        context,
-        "Please enter your email, My Kanisa number, or phone number",
-      );
+      API.showSnack(context, "Please enter your Email, Kanisa Number or Phone");
       return;
     }
 
@@ -177,7 +174,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: TextField(
               controller: identifierController,
               decoration: const InputDecoration(
-                hintText: 'Enter your email, My Kanisa number, or phone number',
+                hintText: 'Enter your Email, Kanisa Number or Phone',
                 border: InputBorder.none,
                 prefixIcon: Icon(Icons.person_outline, color: Colors.black),
               ),

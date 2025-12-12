@@ -244,6 +244,7 @@ class _RegisterState extends State<Register> {
         'is_baptized': false,
         'takes_holy_communion': false,
         'school': TextEditingController(),
+        'photos': <XFile>[],
       });
     });
   }
@@ -255,6 +256,67 @@ class _RegisterState extends State<Register> {
         hasDependents = false;
       }
     });
+  }
+
+  Future<void> _pickDependentPhotos(int index, ImageSource source) async {
+    try {
+      final List<XFile> currentPhotos =
+          dependents[index]['photos'] as List<XFile>;
+      if (currentPhotos.length >= 3) {
+        _toast("Maximum 3 photos allowed per dependent");
+        return;
+      }
+
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          currentPhotos.add(image);
+        });
+      }
+    } catch (e) {
+      _toast('Error picking image: $e');
+    }
+  }
+
+  void _removeDependentPhoto(int depIndex, int photoIndex) {
+    setState(() {
+      (dependents[depIndex]['photos'] as List<XFile>).removeAt(photoIndex);
+    });
+  }
+
+  void _showDependentPhotoOptions(int index) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickDependentPhotos(index, ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickDependentPhotos(index, ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void pickDependentDob(int index) async {
@@ -495,70 +557,76 @@ class _RegisterState extends State<Register> {
     try {
       setState(() => isLoading = true);
 
-      http.Response res;
+      // Prepare fields
+      final fields = {
+        'full_name': fullName.text.trim(),
+        'date_of_birth': dob.text.trim(),
+        'national_id': nationalId.text.trim(),
+        'email': email.text.trim(),
+        'gender': gender,
+        'marital_status': maritalStatus,
+        'is_baptized': isBaptized ? '1' : '0',
+        'takes_holy_communion': takesHolyCommunion ? '1' : '0',
+        'telephone': telephone.text.trim(),
+        'region': selectedRegionName,
+        'presbytery': selectedPresbyteryName,
+        'parish': selectedParishName,
+        'district': district.text.trim(),
+        'congregation': congregation.text.trim(),
+        'dependencies': jsonEncode(deps),
+        'group_ids': jsonEncode(selectedGroupIds.toList()),
+        'password': password.text,
+        'password_confirmation': passwordConfirm.text,
+      };
 
-      // Use multipart if profile image is provided
+      // Prepare Files
+      List<http.MultipartFile> files = [];
+
+      // Profile Image
       if (profileImage != null) {
-        final fields = {
-          'full_name': fullName.text.trim(),
-          'date_of_birth': dob.text.trim(),
-          'national_id': nationalId.text.trim(),
-          'email': email.text.trim(),
-          'gender': gender,
-          'marital_status': maritalStatus,
-          'is_baptized': isBaptized.toString(),
-          'takes_holy_communion': takesHolyCommunion.toString(),
-          'telephone': telephone.text.trim(),
-          'region': selectedRegionName,
-          'presbytery': selectedPresbyteryName,
-          'parish': selectedParishName,
-          'district': district.text.trim(),
-          'congregation': congregation.text.trim(),
-          'dependencies': jsonEncode(deps),
-          'group_ids': jsonEncode(selectedGroupIds.toList()),
-          'password': password.text,
-          'password_confirmation': passwordConfirm.text,
-        };
-
-        final streamedResponse = await API().uploadMultipart(
-          url: Uri.parse('${Config.baseUrl}/members/register'),
-          fields: fields,
-          fileField: 'profile_image',
-          filePath: profileImage!.path,
-          requireAuth: false,
-        );
-
-        res = await http.Response.fromStream(streamedResponse);
-      } else {
-        // Use regular JSON post if no image
-        final payload = {
-          'full_name': fullName.text.trim(),
-          'date_of_birth': dob.text.trim(),
-          'national_id': nationalId.text.trim(),
-          'email': email.text.trim(),
-          'gender': gender,
-          'marital_status': maritalStatus,
-          'is_baptized': isBaptized,
-          'takes_holy_communion': takesHolyCommunion,
-          'telephone': telephone.text.trim(),
-          'region': selectedRegionName,
-          'presbytery': selectedPresbyteryName,
-          'parish': selectedParishName,
-          'district': district.text.trim(),
-          'congregation': congregation.text.trim(),
-          'dependencies': deps,
-          'group_ids': selectedGroupIds.toList(),
-          'password': password.text,
-          'password_confirmation': passwordConfirm.text,
-        };
-
-        res = await API().postRequest(
-          url: Uri.parse('${Config.baseUrl}/members/register'),
-          data: payload,
+        files.add(
+          await http.MultipartFile.fromPath(
+            'profile_image',
+            profileImage!.path,
+          ),
         );
       }
 
+      // Dependent Photos
+      if (hasDependents) {
+        for (int i = 0; i < dependents.length; i++) {
+          final depPhotos = dependents[i]['photos'] as List<XFile>;
+          for (var photo in depPhotos) {
+            files.add(
+              await http.MultipartFile.fromPath(
+                'dependent_photos_$i[]',
+                photo.path,
+              ),
+            );
+          }
+        }
+      }
+
+      // Use uploadMultipartWithFiles for everything (it handles no files too if strictly implemented,
+      // but let's check API. if no files, we can use postRequest, but using multipart is safer for consistency if backend expects it)
+      // Actually my backend handles JSON input specifically if content-type is json.
+      // If I use multipart without files, it's still multipart/form-data.
+      // Backend `register` checks `$request->input('dependencies')`.
+      // Multipart sends fields as strings.
+      // My backend logic `if (is_string($dependenciesInput))` handles the JSON string from multipart.
+      // So using multipart always is fine and simpler.
+
+      http.StreamedResponse streamedResponse = await API()
+          .uploadMultipartWithFiles(
+            url: Uri.parse('${Config.baseUrl}/members/register'),
+            fields: fields,
+            files: files,
+            requireAuth: false,
+          );
+
+      final res = await http.Response.fromStream(streamedResponse);
       final resp = jsonDecode(res.body);
+
       if (resp['status'] == 200) {
         // Save e-kanisa number and profile image to SharedPreferences
         if (resp['member'] != null) {
@@ -596,7 +664,7 @@ class _RegisterState extends State<Register> {
         );
       }
     } catch (e) {
-      API.showSnack(context, 'Something went wrong', success: false);
+      API.showSnack(context, 'Something went wrong: $e', success: false);
     }
     setState(() => isLoading = false);
   }
@@ -1149,7 +1217,7 @@ class _RegisterState extends State<Register> {
                 ),
                 if (isLoadingParishes)
                   SpinKitFadingCircle(
-                    size: 5,
+                    size: 25,
                     duration: const Duration(milliseconds: 1800),
                     itemBuilder: (context, index) {
                       final palette = [
@@ -1336,6 +1404,97 @@ class _RegisterState extends State<Register> {
                   isDense: true,
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // PHOTOS SECTION
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Photos (Max 3)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      // Add Button
+                      if ((d['photos'] as List).length < 3)
+                        GestureDetector(
+                          onTap: () => _showDependentPhotoOptions(i),
+                          child: Container(
+                            width: 70,
+                            height: 70,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_a_photo, color: Colors.grey),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Add',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      // Display Added Photos
+                      ...((d['photos'] as List<XFile>).asMap().entries.map((
+                        entry,
+                      ) {
+                        final idx = entry.key;
+                        final file = entry.value;
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 70,
+                              height: 70,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
+                                image: DecorationImage(
+                                  image: FileImage(File(file.path)),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: GestureDetector(
+                                onTap: () => _removeDependentPhoto(i, idx),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      })),
+                    ],
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -1387,7 +1546,7 @@ class _RegisterState extends State<Register> {
                   vertical: 10,
                   horizontal: 16,
                 ),
-                backgroundColor: Theme.of(context).colorScheme.primary,
+                backgroundColor: Color(0xFF0A1F44),
                 foregroundColor: Colors.white,
                 elevation: 2,
                 shape: RoundedRectangleBorder(
@@ -1400,7 +1559,7 @@ class _RegisterState extends State<Register> {
                 ),
               ),
 
-              label: const Text('Add Dependent'),
+              label: const Text('Add Another Dependent'),
             ),
           ),
         ],

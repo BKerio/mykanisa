@@ -24,6 +24,12 @@ class API {
       ),
     );
   }
+
+  Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('token');
+  }
+
   Future<http.Response> postRequest({
     required Uri url,
     required Map<String, dynamic> data,

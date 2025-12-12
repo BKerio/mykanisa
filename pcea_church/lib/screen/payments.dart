@@ -1150,7 +1150,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 child: _submitting
                     ? Center(
                         child: SpinKitFadingCircle(
-                          size: 108,
+                          size: 64,
                           duration: const Duration(milliseconds: 1200),
                           itemBuilder: (context, index) {
                             final palette = [

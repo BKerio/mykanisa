@@ -20,6 +20,7 @@ class Dependent {
   final bool isBaptized;
   final bool takesHolyCommunion;
   final String? school;
+  final List<String> photoUrls;
 
   Dependent({
     required this.id,
@@ -29,6 +30,7 @@ class Dependent {
     required this.isBaptized,
     required this.takesHolyCommunion,
     this.school,
+    this.photoUrls = const [],
   });
 
   factory Dependent.fromJson(Map<String, dynamic> json) {
@@ -40,6 +42,9 @@ class Dependent {
       isBaptized: json['is_baptized'] ?? false,
       takesHolyCommunion: json['takes_holy_communion'] ?? false,
       school: json['school'],
+      photoUrls: json['photo_urls'] != null
+          ? List<String>.from(json['photo_urls'])
+          : (json['image_url'] != null ? [json['image_url']] : []),
     );
   }
 
@@ -126,14 +131,14 @@ class _DependentsScreenState extends State<DependentsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Dependents'),
-        backgroundColor: Colors.grey.shade100,
-        foregroundColor: Colors.black87,
+        backgroundColor: Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToAddDependent,
-        backgroundColor: Colors.grey.shade200,
-        foregroundColor: Colors.black87,
+        backgroundColor: Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text("Add Dependent"),
       ),
@@ -229,11 +234,11 @@ class _DependentsScreenState extends State<DependentsScreen> {
               icon: const Icon(Icons.add),
               label: const Text('Add Dependent'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black87,
+                backgroundColor: Color(0xFF0A1F44),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
-                  vertical: 15,
+                  vertical: 30,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(25),
@@ -298,16 +303,21 @@ class _DependentsScreenState extends State<DependentsScreen> {
             Row(
               children: [
                 CircleAvatar(
-                  radius: 28,
+                  radius: 40,
                   backgroundColor: Colors.grey.shade300,
-                  child: Text(
-                    dependent.name[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                    ),
-                  ),
+                  backgroundImage: dependent.photoUrls.isNotEmpty
+                      ? NetworkImage(dependent.photoUrls.first)
+                      : null,
+                  child: dependent.photoUrls.isEmpty
+                      ? Text(
+                          dependent.name[0].toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 22,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -377,10 +387,10 @@ class _DependentsScreenState extends State<DependentsScreen> {
               child: ElevatedButton.icon(
                 onPressed: () => _navigateToEditDependent(dependent),
                 icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Edit Dependent'),
+                label: const Text('Update Dependent Details'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal.shade50,
-                  foregroundColor: Colors.teal.shade700,
+                  backgroundColor: Color(0xFF0A1F44),
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

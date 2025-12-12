@@ -134,10 +134,10 @@ class MemberDashboard extends BaseDashboard {
           Navigator.push(
             context,
             MaterialPageRoute(
-               builder: (context) => MinutesHistoryPage(
-                 apiPath: '/minutes/mine',
-                 canCreate: false, // Members cannot create minutes
-               ),
+              builder: (context) => MinutesHistoryPage(
+                apiPath: '/minutes/mine',
+                canCreate: false, // Members cannot create minutes
+              ),
             ),
           );
         },
@@ -149,20 +149,20 @@ class MemberDashboard extends BaseDashboard {
   List<BottomNavigationBarItem> getBottomNavItems() {
     return const [
       BottomNavigationBarItem(
-        icon: Icon(Icons.grid_view_rounded),
+        icon: Icon(Icons.grid_view_rounded, color: Color(0xFF0A1F44)),
         label: "Home",
       ),
       BottomNavigationBarItem(
-        icon: Icon(Icons.chat_bubble_outline_rounded),
+        icon: Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF0A1F44)),
         label: "Inbox",
       ),
       BottomNavigationBarItem(
-        icon: Icon(Icons.people_outline_rounded),
+        icon: Icon(Icons.people_outline_rounded, color: Color(0xFF0A1F44)),
         label: "Family",
       ),
       BottomNavigationBarItem(
-        icon: Icon(Icons.settings_outlined),
-        label: "App Settings",
+        icon: Icon(Icons.settings_outlined, color: Color(0xFF0A1F44)),
+        label: "Settings",
       ),
     ];
   }

@@ -74,7 +74,10 @@ class GroupLeaderDashboard extends BaseDashboard {
   @override
   List<BottomNavigationBarItem> getBottomNavItems() {
     return const [
-      BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.grid_view_rounded),
+        label: "Home",
+      ),
       BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
       BottomNavigationBarItem(icon: Icon(Icons.people), label: "Group"),
       BottomNavigationBarItem(icon: Icon(Icons.event), label: "Events"),
