@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:pcea_church/config/server.dart';
 import 'dart:convert';
 import '../method/api.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:flutter/services.dart';
 
 class MemberDigitalFileScreen extends StatefulWidget {
   const MemberDigitalFileScreen({super.key});
@@ -19,14 +24,15 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
   Map<String, dynamic>? _digitalFile;
   TabController? _tabController;
   final DateFormat _dateFormat = DateFormat('MMM dd, yyyy');
+  final DateFormat _dateTimeFormat = DateFormat('MMM dd, yyyy HH:mm');
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 6,
+      length: 7,
       vsync: this,
-    ); // Profile, Family, Attendance, Finance, Tasks, Logs
+    ); // Profile, Family, Attendance, Finance, Tasks, Comm, Logs
   }
 
   @override
@@ -39,39 +45,23 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
   Future<void> _searchMember(String query) async {
     if (query.trim().isEmpty) return;
 
-    setState(() {
-      _isLoading = true;
-      _digitalFile = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _digitalFile = null;
+      });
+    }
 
     try {
-      // First, find the member. If query is numeric, assume ID or E-Kanisa No.
-      // Ideally we need an endpoint to search first, THEN get details.
-      // For now, I'll leverage the existing 'members' list endpoint or a search,
-      // but to save specific calls, I will try to fetch by ID if possible or assume query is E-Kanisa Number which is unique.
-      // But the backend `getDigitalFile` expects an ID.
-      // So I need to FIND the ID first.
-
-      // I'll search for the member first using existing MemberController::index logic or similar if available for searching.
-      // The `AdminMembersController::index` allows filtering.
-      // Let's assume the user picks from a list in a real scenario, but here I'll try to find by query.
-
-      // Hack: I'll use the getAllMembers endpoint and filter locally or use a search param if available.
-      // Backend route: GET /api/elder/members
-
       final searchRes = await API().getRequest(
         url: Uri.parse('${Config.baseUrl}/elder/members?q=$query'),
-        //requireAuth: true,
       );
 
       if (searchRes.statusCode == 200) {
         final data = jsonDecode(searchRes.body);
-        // Laravel paginate response has 'data' key at root, or sometimes wrapped.
-        // MembersController returns query->paginate() directly.
         final members = data['data'];
 
         if (members != null && (members as List).isNotEmpty) {
-          // Take the first match
           final memberId = members[0]['id'];
           await _fetchDigitalFile(memberId);
         } else {
@@ -83,7 +73,7 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
     } catch (e) {
       _showError('Error searching member: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -91,14 +81,17 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
     try {
       final response = await API().getRequest(
         url: Uri.parse('${Config.baseUrl}/elder/members/$id/digital-file'),
-        //requireAuth: true,
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          _digitalFile = data['data'];
-        });
+        if (mounted) {
+          setState(() {
+            _digitalFile = data['data'];
+            // Reset to first tab when new data loads to ensure UI consistency
+            _tabController?.animateTo(0);
+          });
+        }
       } else {
         _showError('Failed to load digital file');
       }
@@ -114,12 +107,557 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
     ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
+  Future<void> _generatePdf() async {
+    if (_digitalFile == null) return;
+
+    final pdf = pw.Document();
+    final profile = _digitalFile!['profile'];
+    await PdfGoogleFonts.nunitoExtraLight();
+    final fontBold = await PdfGoogleFonts.nunitoBold();
+    final fontRegular = await PdfGoogleFonts.nunitoRegular();
+
+    // Helper for section headers
+    pw.Widget sectionHeader(String title) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 8),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              title,
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                font: fontBold,
+                color: PdfColors.green800,
+              ),
+            ),
+            pw.Divider(color: PdfColors.green800),
+          ],
+        ),
+      );
+    }
+
+    // Helper for key-value info rows
+    pw.Widget infoRow(String label, String? value) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.SizedBox(
+              width: 120,
+              child: pw.Text(
+                label,
+                style: pw.TextStyle(
+                  color: PdfColors.grey700,
+                  font: fontRegular,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+            pw.Expanded(
+              child: pw.Text(
+                value ?? '-',
+                style: pw.TextStyle(font: fontRegular, fontSize: 10),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Helper for table headers
+    pw.TextStyle headerStyle() => pw.TextStyle(
+      fontWeight: pw.FontWeight.bold,
+      font: fontBold,
+      fontSize: 10,
+      color: PdfColors.white,
+    );
+    pw.TextStyle cellStyle() => pw.TextStyle(font: fontRegular, fontSize: 10);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          return [
+            // --- Header ---
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'PCEA SGM CHURCH',
+                      style: pw.TextStyle(
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold,
+                        font: fontBold,
+                        color: PdfColor(10 / 255, 31 / 255, 68 / 255),
+                      ),
+                    ),
+                    pw.Text(
+                      'Member Digital File',
+                      style: pw.TextStyle(
+                        fontSize: 14,
+                        font: fontRegular,
+                        color: PdfColors.grey700,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.Text(
+                  'Printed: ${_dateTimeFormat.format(DateTime.now())}',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    font: fontRegular,
+                    color: PdfColors.grey,
+                  ),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 20),
+
+            // --- Profile Summary ---
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey300),
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                color: PdfColors.grey50,
+              ),
+              child: pw.Row(
+                children: [
+                  pw.Container(
+                    width: 60,
+                    height: 60,
+                    decoration: pw.BoxDecoration(
+                      shape: pw.BoxShape.circle,
+                      color: PdfColor(10 / 255, 31 / 255, 68 / 255),
+                    ),
+                    child: pw.Center(
+                      child: pw.Text(
+                        (profile['full_name'] ?? profile['name'] ?? '?')
+                            .toString()[0]
+                            .toUpperCase(),
+                        style: pw.TextStyle(
+                          fontSize: 24,
+                          fontWeight: pw.FontWeight.bold,
+                          font: fontBold,
+                          color: PdfColors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 16),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        profile['full_name'] ?? profile['name'] ?? 'Unknown',
+                        style: pw.TextStyle(
+                          fontSize: 18,
+                          fontWeight: pw.FontWeight.bold,
+                          font: fontBold,
+                        ),
+                      ),
+                      pw.Text(
+                        profile['e_kanisa_number'] ?? 'No Number',
+                        style: pw.TextStyle(
+                          font: fontRegular,
+                          fontSize: 12,
+                          color: PdfColors.grey700,
+                        ),
+                      ),
+                      pw.Text(
+                        profile['email'] ?? '',
+                        style: pw.TextStyle(
+                          font: fontRegular,
+                          fontSize: 10,
+                          color: PdfColors.grey600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 10),
+
+            // --- Personal Details ---
+            sectionHeader('Personal & Church Details'),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      infoRow('Phone', profile['telephone']),
+                      infoRow(
+                        'National ID',
+                        profile['id_number'] ?? profile['national_id'],
+                      ),
+                      infoRow(
+                        'Date of Birth',
+                        profile['dob'] ??
+                            profile['pk_dob'] ??
+                            profile['date_of_birth'],
+                      ),
+                      infoRow('Gender', profile['gender']),
+                      infoRow('Marital Status', profile['marital_status']),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(width: 16),
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      infoRow('District', profile['district']),
+                      infoRow('Congregation', profile['congregation']),
+                      infoRow('Parish', profile['parish']),
+                      infoRow(
+                        'Baptized',
+                        (profile['is_baptized'] == true ||
+                                profile['is_baptized'] == 1)
+                            ? 'Yes'
+                            : 'No',
+                      ),
+                      infoRow(
+                        'Holy Communion',
+                        (profile['takes_holy_communion'] == true ||
+                                profile['takes_holy_communion'] == 1)
+                            ? 'Yes'
+                            : 'No',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            // --- Family ---
+            if ((_digitalFile!['profile']['dependencies'] as List?)
+                    ?.isNotEmpty ??
+                false) ...[
+              sectionHeader('Family & Dependents'),
+              pw.Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: (_digitalFile!['profile']['dependencies'] as List)
+                    .map((d) {
+                      return pw.Container(
+                        padding: const pw.EdgeInsets.all(8),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border.all(color: PdfColors.grey200),
+                          borderRadius: const pw.BorderRadius.all(
+                            pw.Radius.circular(4),
+                          ),
+                        ),
+                        width: 150,
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              d['name'],
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                                font: fontBold,
+                                fontSize: 10,
+                              ),
+                            ),
+                            pw.Text(
+                              'Born: ${d['year_of_birth']}',
+                              style: pw.TextStyle(
+                                font: fontRegular,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    })
+                    .toList(),
+              ),
+            ],
+
+            // --- Attendance ---
+            if ((_digitalFile!['attendances'] as List?)?.isNotEmpty ??
+                false) ...[
+              sectionHeader('Service Attendance History'),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(2),
+                  1: const pw.FlexColumnWidth(1),
+                  2: const pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.green700,
+                    ),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Event Type', style: headerStyle()),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Date', style: headerStyle()),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Method', style: headerStyle()),
+                      ),
+                    ],
+                  ),
+                  ...(_digitalFile!['attendances'] as List).map((a) {
+                    final isScanned = a['scanned_at'] != null;
+                    return pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            a['event_type'] ?? 'Service',
+                            style: cellStyle(),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(a['event_date'], style: cellStyle()),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            isScanned ? 'Scanned' : 'Manual',
+                            style: cellStyle().copyWith(
+                              color: isScanned
+                                  ? PdfColors.blue800
+                                  : PdfColors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ],
+              ),
+            ],
+
+            // --- Contributions ---
+            if ((_digitalFile!['contributions'] as List?)?.isNotEmpty ??
+                false) ...[
+              sectionHeader('Contributions & Finance'),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.teal700,
+                    ),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Type', style: headerStyle()),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Date', style: headerStyle()),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Amount', style: headerStyle()),
+                      ),
+                    ],
+                  ),
+                  ...(_digitalFile!['contributions'] as List).map((c) {
+                    return pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            c['contribution_type'].toString().toUpperCase(),
+                            style: cellStyle(),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            _dateFormat.format(
+                              DateTime.parse(c['contribution_date']),
+                            ),
+                            style: cellStyle(),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            'KES ${c['amount']}',
+                            style: cellStyle().copyWith(
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ],
+              ),
+            ],
+
+            // --- Tasks ---
+            if ((_digitalFile!['tasks'] as List?)?.isNotEmpty ?? false) ...[
+              sectionHeader('Assigned Tasks'),
+              pw.Column(
+                children: (_digitalFile!['tasks'] as List).map((t) {
+                  return pw.Container(
+                    margin: const pw.EdgeInsets.only(bottom: 5),
+                    padding: const pw.EdgeInsets.all(5),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfColors.grey200),
+                      color: PdfColors.orange50,
+                    ),
+                    child: pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Expanded(
+                          child: pw.Text(t['description'], style: cellStyle()),
+                        ),
+                        pw.SizedBox(width: 8),
+                        pw.Text(
+                          t['status'],
+                          style: cellStyle().copyWith(
+                            color: t['status'] == 'Done'
+                                ? PdfColors.green800
+                                : PdfColors.orange800,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
+            // --- Communications ---
+            if ((_digitalFile!['communications'] as List?)?.isNotEmpty ??
+                false) ...[
+              sectionHeader('Communication Log'),
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(1),
+                  1: const pw.FlexColumnWidth(3),
+                  2: const pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.blue800,
+                    ),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Context', style: headerStyle()),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Subject', style: headerStyle()),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Date', style: headerStyle()),
+                      ),
+                    ],
+                  ),
+                  ...(_digitalFile!['communications'] as List).map((c) {
+                    final profileId = _digitalFile!['profile']['id'];
+                    final isOutbound = c['sent_by'] == profileId;
+                    String context =
+                        c['context'] ??
+                        (isOutbound ? 'To Elder' : 'From Elder');
+
+                    return pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            context,
+                            style: cellStyle().copyWith(fontSize: 8),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(c['title'] ?? '-', style: cellStyle()),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                            _dateFormat.format(DateTime.parse(c['created_at'])),
+                            style: cellStyle().copyWith(fontSize: 8),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ],
+              ),
+            ],
+
+            // --- Logs ---
+            if ((_digitalFile!['audit_logs'] as List?)?.isNotEmpty ??
+                false) ...[
+              sectionHeader('Audit Trail'),
+              pw.ListView.builder(
+                itemCount: (_digitalFile!['audit_logs'] as List)
+                    .take(10)
+                    .length,
+                itemBuilder: (context, index) {
+                  final l = (_digitalFile!['audit_logs'] as List)[index];
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 2),
+                    child: pw.Text(
+                      '• ${l['action']} - ${_dateTimeFormat.format(DateTime.parse(l['created_at']))}',
+                      style: pw.TextStyle(
+                        font: fontRegular,
+                        fontSize: 8,
+                        color: PdfColors.grey700,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ];
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
+  // _pdfInfoRow helper removed as it's now inside _generatePdf for better font scoping
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Member Digital File'),
-        backgroundColor: const Color(0xFF2E7D32),
+        backgroundColor: const Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
+        actions: [
+          if (_digitalFile != null)
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf, size: 30),
+              onPressed: _generatePdf,
+              tooltip: 'Export PDF',
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -149,7 +687,7 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
                 ElevatedButton(
                   onPressed: () => _searchMember(_searchController.text),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
+                    backgroundColor: const Color(0xFF0A1F44),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -162,7 +700,28 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
           ),
 
           if (_isLoading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
+            Expanded(
+              child: Center(
+                child: SpinKitFadingCircle(
+                  size: 64,
+                  duration: const Duration(milliseconds: 1800),
+                  itemBuilder: (context, index) {
+                    final palette = const [
+                      Color(0xFF0A1F44),
+                      Color(0xFF8B0000),
+                      Colors.blue,
+                      Colors.green,
+                    ];
+                    return DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: palette[index % palette.length],
+                        shape: BoxShape.circle,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            )
           else if (_digitalFile != null)
             Expanded(child: _buildFileContent())
           else
@@ -171,11 +730,15 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.folder_shared, size: 80, color: Colors.grey),
+                    Icon(
+                      Icons.folder_shared,
+                      size: 120,
+                      color: Color(0xFF0A1F44),
+                    ),
                     SizedBox(height: 16),
                     Text(
                       'Search for a member to view their digital file',
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: Colors.black54, fontSize: 16),
                     ),
                   ],
                 ),
@@ -249,7 +812,7 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
         // Tabs
         TabBar(
           controller: _tabController,
-          labelColor: const Color(0xFF2E7D32),
+          labelColor: const Color(0xFF0A1F44),
           unselectedLabelColor: Colors.grey,
           isScrollable: true,
           tabs: const [
@@ -258,6 +821,7 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
             Tab(text: 'Attendance'),
             Tab(text: 'Finance'),
             Tab(text: 'Tasks'),
+            Tab(text: 'Comm.'),
             Tab(text: 'Logs'),
           ],
         ),
@@ -271,6 +835,7 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
               _buildAttendanceTab(),
               _buildFinanceTab(),
               _buildTasksTab(),
+              _buildCommunicationsTab(),
               _buildLogsTab(),
             ],
           ),
@@ -285,10 +850,7 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
       padding: const EdgeInsets.all(16),
       children: [
         _infoTile('Phone', p['telephone']),
-        _infoTile(
-          'National ID',
-          p['id_number'] ?? p['national_id'],
-        ), // Handle inconsistent naming if any
+        _infoTile('National ID', p['id_number'] ?? p['national_id']),
         _infoTile(
           'Date of Birth',
           p['dob'] ?? p['pk_dob'] ?? p['date_of_birth'] ?? '-',
@@ -436,16 +998,31 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 8),
-          ...att.map(
-            (a) => ListTile(
+          ...att.map((a) {
+            final isScanned = a['scanned_at'] != null;
+            return ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.event_available, color: Colors.green),
-              title: Text(a['event_type'] ?? 'Service'),
-              subtitle: Text(
-                _dateFormat.format(DateTime.parse(a['event_date'])),
+              leading: Icon(
+                isScanned ? Icons.qr_code_scanner : Icons.event_available,
+                color: isScanned ? Colors.blue : Colors.green,
               ),
-            ),
-          ),
+              title: Text(a['event_type'] ?? 'Service'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_dateFormat.format(DateTime.parse(a['event_date']))),
+                  if (isScanned)
+                    Text(
+                      'Scanned: ${a['scanned_at']}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF0A1F44),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
           const Divider(),
         ],
         if (meetAtt != null && meetAtt.isNotEmpty) ...[
@@ -492,7 +1069,7 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: const CircleAvatar(
-              backgroundColor: Colors.teal,
+              backgroundColor: Color(0xFF0A1F44),
               child: Icon(Icons.attach_money, color: Colors.white),
             ),
             title: Text(c['contribution_type'].toString().toUpperCase()),
@@ -503,7 +1080,7 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
               'KES ${c['amount']}',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.teal,
+                color: Color(0xFF0A1F44),
                 fontSize: 15,
               ),
             ),
@@ -585,6 +1162,90 @@ class _MemberDigitalFileScreenState extends State<MemberDigitalFileScreen>
                       ),
                     ],
                   ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCommunicationsTab() {
+    final comms = _digitalFile!['communications'] as List?;
+    if (comms == null || comms.isEmpty)
+      return const Center(child: Text('No communication history'));
+
+    final profileId = _digitalFile!['profile']['id'];
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: comms.length,
+      itemBuilder: (context, index) {
+        final c = comms[index];
+        final isOutbound = c['sent_by'] == profileId; // Sent BY member
+
+        // Determine badge label and color based on context/type
+        String contextLabel =
+            c['context'] ?? (isOutbound ? 'To Elder' : 'From Elder');
+        Color badgeColor = isOutbound
+            ? Colors.blue.shade100
+            : Colors.green.shade100;
+        Color textColor = isOutbound
+            ? Colors.blue.shade900
+            : Colors.green.shade900;
+        if (c['type'] == 'broadcast') {
+          badgeColor = Colors.orange.shade100;
+          textColor = Colors.orange.shade900;
+        } else if (c['type'] == 'group') {
+          badgeColor = Colors.purple.shade100;
+          textColor = Colors.purple.shade900;
+        }
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badgeColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            contextLabel,
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      _dateTimeFormat.format(DateTime.parse(c['created_at'])),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  c['title'] ?? 'No Subject',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(c['message'] ?? ''),
               ],
             ),
           ),

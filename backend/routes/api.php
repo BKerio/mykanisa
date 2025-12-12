@@ -367,6 +367,9 @@ Route::middleware('auth:sanctum')->group(function(){
 // Admin Routes
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function() {
     Route::get('/audit-logs', [\App\Http\Controllers\Admin\AuditLogController::class, 'index']);
+    Route::get('/audit-logs/communications', [\App\Http\Controllers\Admin\AuditLogController::class, 'communications']);
+    Route::get('/audit-logs/tasks', [\App\Http\Controllers\Admin\AuditLogController::class, 'tasks']);
+    Route::get('/audit-logs/attendances', [\App\Http\Controllers\Admin\AuditLogController::class, 'attendances']);
 });
 
 // Treasurer routes

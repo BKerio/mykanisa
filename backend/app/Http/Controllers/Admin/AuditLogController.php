@@ -46,4 +46,56 @@ class AuditLogController extends Controller
             'data' => $logs,
         ]);
     }
+
+    public function communications(Request $request)
+    {
+        // Fetch global communications (Announcements)
+        $query = \App\Models\Announcement::with(['sender', 'group']) // Add recipient/group relationships as needed
+            ->orderBy('created_at', 'desc');
+
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where('title', 'like', "%{$search}%")
+                  ->orWhere('message', 'like', "%{$search}%");
+        }
+
+        $data = $query->paginate(20);
+        return response()->json(['status' => 200, 'data' => $data]);
+    }
+
+    public function tasks(Request $request)
+    {
+        // Fetch global tasks (MinuteActionItems)
+        // Assuming MinuteActionItem exists and has 'assigned_to' or similar
+        // Need to check relationship. Assuming 'assignedHandlers' or 'members'
+        $query = \App\Models\MinuteActionItem::with(['minute']) // Eager load minute for context
+            ->orderBy('created_at', 'desc');
+
+        if ($request->has('search') && !empty($request->search)) {
+             $search = $request->search;
+             $query->where('action', 'like', "%{$search}%");
+        }
+
+        $data = $query->paginate(20);
+        return response()->json(['status' => 200, 'data' => $data]);
+    }
+
+    public function attendances(Request $request)
+    {
+        // Fetch global attendances
+        $query = \App\Models\Attendance::with(['member'])
+            ->orderBy('event_date', 'desc')
+            ->orderBy('created_at', 'desc');
+
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->whereHas('member', function($q) use ($search){
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('e_kanisa_number', 'like', "%{$search}%");
+            });
+        }
+
+        $data = $query->paginate(20);
+        return response()->json(['status' => 200, 'data' => $data]);
+    }
 }

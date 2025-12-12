@@ -744,7 +744,7 @@ class MemberController extends Controller
             ->orderBy('minutes.meeting_date', 'desc')
             ->get();
             
-        // 5. Audit Logs
+        // 6. Audit Logs
         $auditLogs = [];
         $linkedUser = User::where('email', $member->email)->first();
         if ($linkedUser) {
@@ -754,6 +754,49 @@ class MemberController extends Controller
                 ->limit(50)
                 ->get();
         }
+
+        // 7. Communication Logs (Messages sent to/from member)
+        // Get member's groups
+        $groupIds = $member->groups()->pluck('groups.id')->toArray();
+
+        $communications = \App\Models\Announcement::where(function($q) use ($member, $groupIds) {
+                // Sent by the member
+                $q->where('sent_by', $member->id)
+                  // Received by member (Individual)
+                  ->orWhere(function($sub) use ($member) {
+                      $sub->where('recipient_id', $member->id)
+                          ->where('type', 'individual');
+                  })
+                  // Received by member's group
+                  ->orWhere(function($sub) use ($groupIds) {
+                      $sub->whereIn('recipient_id', $groupIds)
+                          ->where('type', 'group');
+                  })
+                  // Broadcasts (sent to everyone)
+                  ->orWhere('type', 'broadcast');
+            })
+            ->with(['sender:id,full_name,role'])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function($comm) {
+                // Manually resolve recipient/context based on type
+                $commArray = $comm->toArray();
+                
+                if ($comm->type === 'individual') {
+                    $recipient = \App\Models\Member::find($comm->recipient_id);
+                    $commArray['recipient_name'] = $recipient ? $recipient->full_name : 'Unknown';
+                    $commArray['context'] = 'Individual Connection';
+                } elseif ($comm->type === 'group') {
+                    $group = \App\Models\Group::find($comm->recipient_id);
+                    $commArray['recipient_name'] = $group ? $group->name : 'Unknown Group';
+                    $commArray['context'] = 'Group: ' . $commArray['recipient_name'];
+                } elseif ($comm->type === 'broadcast') {
+                    $commArray['recipient_name'] = 'All Members';
+                    $commArray['context'] = 'Broadcast';
+                }
+
+                return $commArray;
+            });
 
         // Format Photos for Dependents
         $memberArray = $member->toArray();
@@ -776,6 +819,7 @@ class MemberController extends Controller
                 'contributions' => $contributions,
                 'tasks' => $tasks,
                 'audit_logs' => $auditLogs,
+                'communications' => $communications,
             ]
         ]);
     }

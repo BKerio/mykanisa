@@ -10,7 +10,6 @@ import {
     Calendar,
     Monitor,
     Download,
-    Clock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLoader from "@/lib/loader";
@@ -18,296 +17,326 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 // --- Types ---
+type TabType = 'logs' | 'communications' | 'tasks' | 'attendances';
+
 interface AuditLogDto {
     id: number;
     user_id: number | null;
     action: string;
-    model_type: string | null;
-    model_id: number | null;
     description: string;
     details: any;
     ip_address: string;
     user_agent: string;
     created_at: string;
-    formatted_date: string;
     user?: {
-        id: number;
         name: string;
-        email: string;
-        member?: {
-            full_name: string;
-            e_kanisa_number: string;
-        }
+        member?: { full_name: string; e_kanisa_number: string; }
     };
 }
 
-interface PaginatedResponse<T> {
-    data: T[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
+interface CommunicationDto {
+    id: number;
+    title: string;
+    message: string;
+    type: string;
+    sent_by: number;
+    created_at: string;
+    sender?: { full_name: string; role: string; };
+    group?: { name: string; };
+}
+
+interface TaskDto {
+    id: number;
+    action: string;
+    status: string;
+    due_date?: string;
+    created_at: string;
+    minute?: { title: string; };
+}
+
+interface AttendanceDto {
+    id: number;
+    event_type: string;
+    event_date: string;
+    scanned_at?: string;
+    created_at: string;
+    member?: { full_name: string; e_kanisa_number: string; };
 }
 
 // --- Helpers ---
-const getActionColor = (action: string) => {
+const getActionStyle = (action: string) => {
     const a = action.toLowerCase();
-    if (a.includes('create') || a.includes('add')) return "bg-green-100 text-green-800 border-green-200";
-    if (a.includes('update') || a.includes('edit')) return "bg-blue-100 text-blue-800 border-blue-200";
-    if (a.includes('delete') || a.includes('remove')) return "bg-red-100 text-red-800 border-red-200";
-    if (a.includes('login')) return "bg-purple-100 text-purple-800 border-purple-200";
-    return "bg-slate-100 text-slate-800 border-slate-200";
+    if (a.includes('create') || a.includes('add')) return { bg: "bg-emerald-100", text: "text-emerald-800", border: "border-emerald-200", icon: "plus" };
+    if (a.includes('update') || a.includes('edit')) return { bg: "bg-blue-100", text: "text-blue-800", border: "border-blue-200", icon: "edit" };
+    if (a.includes('delete') || a.includes('remove')) return { bg: "bg-red-100", text: "text-red-800", border: "border-red-200", icon: "trash" };
+    if (a.includes('login') || a.includes('auth')) return { bg: "bg-purple-100", text: "text-purple-800", border: "border-purple-200", icon: "lock" };
+    return { bg: "bg-slate-100", text: "text-slate-800", border: "border-slate-200", icon: "activity" };
+};
+
+const getCommStyle = (type: string) => {
+    if (type === 'broadcast') return { bg: "bg-orange-100", text: "text-orange-900", label: "Broadcast" };
+    if (type === 'group') return { bg: "bg-indigo-100", text: "text-indigo-900", label: "Group" };
+    return { bg: "bg-blue-100", text: "text-blue-900", label: "Individual" };
 };
 
 // --- Main Component ---
 const AuditLogsPage = () => {
     const API_URL = import.meta.env.VITE_API_URL;
+    const [activeTab, setActiveTab] = useState<TabType>('logs');
     const [query, setQuery] = useState("");
     const [page, setPage] = useState(1);
-    const [perPage, setPerPage] = useState(20);
     const [loading, setLoading] = useState(true);
-    const [logs, setLogs] = useState<AuditLogDto[]>([]);
+    const [data, setData] = useState<any[]>([]);
     const [total, setTotal] = useState(0);
-    const [isFirstLoad, setIsFirstLoad] = useState(true);
+    const [perPage] = useState(20);
 
     const token = useMemo(() => (typeof window !== "undefined" ? localStorage.getItem("token") : null), []);
 
-    const fetchLogs = async () => {
+    const fetchData = async () => {
         if (!token) return;
         setLoading(true);
         try {
-            const url = `${API_URL}/admin/audit-logs?search=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`;
-            const res = await axios.get<PaginatedResponse<AuditLogDto>>(url, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            console.log("Logs response:", res.data);
+            let endpoint = '/admin/audit-logs';
+            if (activeTab === 'communications') endpoint = '/admin/audit-logs/communications';
+            if (activeTab === 'tasks') endpoint = '/admin/audit-logs/tasks';
+            if (activeTab === 'attendances') endpoint = '/admin/audit-logs/attendances';
 
-            // Fix: API returns { status: 200, data: { data: [], total: ... } }
+            const url = `${API_URL}${endpoint}?search=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`;
+            const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+
             const responseData = res.data as any;
             const pagination = responseData.data;
+            const items = Array.isArray(pagination) ? pagination : (pagination?.data || []);
 
-            // Extract array from pagination object
-            const logsArray = Array.isArray(pagination) ? pagination : (pagination?.data || []);
-
-            setLogs(logsArray);
-            setTotal(pagination?.total || logsArray.length);
+            setData(items);
+            setTotal(pagination?.total || items.length);
         } catch (e) {
-            console.error("Fetch Error", e);
+            console.error(e);
         } finally {
             setLoading(false);
-            if (isFirstLoad) setIsFirstLoad(false);
         }
     };
 
     useEffect(() => {
-        const handler = setTimeout(() => fetchLogs(), 400);
-        return () => clearTimeout(handler);
-    }, [query, page, perPage]);
+        setPage(1);
+        fetchData();
+    }, [activeTab]);
 
-    // Auto-refresh every 30 seconds
     useEffect(() => {
-        const interval = setInterval(() => {
-            if (!loading) fetchLogs();
-        }, 30000);
-        return () => clearInterval(interval);
-    }, [loading, query, page, perPage]); // Refresh based on current view params
+        const handler = setTimeout(() => fetchData(), 400);
+        return () => clearTimeout(handler);
+    }, [query, page]);
 
-    const exportPDF = () => {
-        const doc = new jsPDF();
+    // Formatters
+    const formatDate = (date: string) => new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const formatTime = (date: string) => new Date(date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
-        doc.setFontSize(18);
-        doc.text("System Audit Logs", 14, 22);
+    // Renderers
+    const renderLogs = (log: AuditLogDto) => {
+        const style = getActionStyle(log.action);
+        return (
+            <div className="flex flex-col md:flex-row gap-5 items-start">
+                <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${style.bg} ${style.text}`}>
+                    <Activity className="w-5 h-5" />
+                </div>
+                <div className="flex-grow w-full">
+                    <div className="flex justify-between items-start mb-1">
+                        <h3 className="font-bold text-slate-900">{log.action}</h3>
+                        <span className="text-xs text-slate-400 whitespace-nowrap">{formatDate(log.created_at)} {formatTime(log.created_at)}</span>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-2">{log.description}</p>
+                    {log.details && (
+                        <div className="text-[10px] bg-slate-50 p-2 rounded border border-slate-200 font-mono text-slate-500 overflow-x-auto max-h-32 overflow-y-auto custom-scrollbar">
+                            {typeof log.details === 'object' ? JSON.stringify(log.details, null, 2).replace(/[{},"]/g, '').trim() : String(log.details)}
+                        </div>
+                    )}
+                    <div className="mt-2 text-xs text-slate-400 flex items-center gap-2">
+                        <span className="font-bold text-slate-500">{log.user?.member?.full_name || log.user?.name || 'System'}</span>
+                        <span>•</span>
+                        <span className="font-mono">{log.ip_address}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
-        doc.setFontSize(11);
-        doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+    const renderComm = (comm: CommunicationDto) => {
+        const style = getCommStyle(comm.type);
+        return (
+            <div className="flex gap-4">
+                <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${style.bg} ${style.text}`}>
+                    <span className="font-bold text-xs">{style.label[0]}</span>
+                </div>
+                <div className="flex-grow">
+                    <div className="flex justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${style.bg} ${style.text}`}>{style.label}</span>
+                            <span className="font-bold text-slate-900">{comm.title || 'No Subject'}</span>
+                        </div>
+                        <span className="text-xs text-slate-400">{formatDate(comm.created_at)}</span>
+                    </div>
+                    <p className="text-sm text-slate-600 line-clamp-3 mb-2">{comm.message}</p>
+                    <div className="text-xs text-slate-500">
+                        From: <span className="font-bold">{comm.sender?.full_name || 'System'}</span> {comm.group && `• To: ${comm.group.name}`}
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
-        const tableColumn = ["Date", "User", "Action", "Description", "IP / Agent"];
-        const tableRows = logs.map(log => [
-            new Date(log.created_at).toLocaleString(),
-            log.user?.member?.full_name || log.user?.name || "System \n" + (log.user?.email || ""),
-            log.action,
-            log.description,
-            `${log.ip_address}\n${log.user_agent.substring(0, 30)}...`
-        ]);
+    const renderTask = (task: TaskDto) => {
+        const isDone = task.status === 'Done' || task.status === 'Completed';
+        return (
+            <div className="flex gap-4 items-center">
+                <div className={`w-1.5 rounded-full h-12 ${isDone ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                <div className="flex-grow">
+                    <div className="flex justify-between">
+                        <h4 className={`font-bold ${isDone ? 'text-slate-500 line-through' : 'text-slate-900'}`}>{task.action}</h4>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {task.status}
+                        </span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                        <span>Minute: {task.minute?.title || 'Unknown'}</span>
+                        {task.due_date && (
+                            <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                                <Calendar className="w-3 h-3" /> {formatDate(task.due_date)}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
-        autoTable(doc, {
-            head: [tableColumn],
-            body: tableRows,
-            startY: 40,
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [30, 58, 138] }, // Blue-950
-        });
-
-        doc.save(`Audit_Logs_${new Date().toISOString().slice(0, 10)}.pdf`);
+    const renderAttendance = (att: AttendanceDto) => {
+        const isScanned = !!att.scanned_at;
+        return (
+            <div className="flex items-center gap-4">
+                <div className={`p-2.5 rounded-xl ${isScanned ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {isScanned ? <Monitor className="w-5 h-5" /> : <Calendar className="w-5 h-5" />}
+                </div>
+                <div className="flex-grow">
+                    <div className="flex justify-between items-start">
+                        <div className="font-bold text-slate-900">{att.member?.full_name || 'Unknown Member'}</div>
+                        {isScanned && (
+                            <div className="text-[10px] bg-blue-50 text-blue-800 px-2 py-1 rounded border border-blue-100 font-bold">
+                                Scanned {formatTime(att.scanned_at!)}
+                            </div>
+                        )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                        {att.member?.e_kanisa_number && <span className="font-mono mr-2">#{att.member.e_kanisa_number}</span>}
+                        <span>{att.event_type} • {formatDate(att.event_date)}</span>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     const totalPages = Math.max(1, Math.ceil(total / perPage));
 
-    if (isFirstLoad && loading) {
+    if (loading && activeTab === 'logs' && data.length === 0) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-                <DashboardLoader title="Loading Logs" subtitle="Fetching system activity..." />
+                <DashboardLoader title="Loading Activity" subtitle="Fetching system records..." />
             </div>
         );
     }
 
     return (
         <div className="p-6 md:p-10 bg-slate-50 min-h-screen font-sans text-slate-900">
+            {/* Header with Tabs */}
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-6">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-[#0A1F44] mb-1">System Activity</h1>
+                    <p className="text-slate-500 text-sm">Global registry of all system events and records</p>
+                </div>
 
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="p-2.5 bg-blue-950 text-white rounded-xl shadow-sm">
-                            <Activity className="w-6 h-6" />
-                        </div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">System Audit Logs</h1>
-                    </div>
-                    <p className="text-slate-500 text-sm ml-1">Track all system activities and changes</p>
-                </motion.div>
-
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-center">
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mr-2 bg-slate-100 px-3 py-1.5 rounded-full">
-                        <Clock className="w-3. h-3" />
-                        <span>Auto-refresh: 30s</span>
-                    </div>
-
-                    <div className="relative group w-full sm:w-auto">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-blue-900 transition-colors" />
-                        <input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search logs..."
-                            className="pl-10 pr-4 py-2.5 w-full sm:w-64 bg-white border border-slate-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 transition-all outline-none text-slate-700"
-                        />
-                    </div>
-
-                    <div className="flex gap-2">
+                {/* Tabs Pilla */}
+                <div className="flex overflow-x-auto bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm max-w-full">
+                    {(['logs', 'communications', 'tasks', 'attendances'] as TabType[]).map((tab) => (
                         <button
-                            onClick={exportPDF}
-                            title="Export to PDF"
-                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 hover:border-blue-900 hover:text-blue-900 transition-all shadow-sm active:scale-95"
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab
+                                    ? 'bg-[#0A1F44] text-white shadow-md transform scale-[1.02]'
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                                }`}
                         >
-                            <Download className="w-4 h-4" />
-                            <span className="hidden sm:inline">Export</span>
+                            {tab.charAt(0).toUpperCase() + tab.slice(1)}
                         </button>
-                        <button
-                            onClick={fetchLogs}
-                            title="Refresh Now"
-                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 hover:border-blue-900 hover:text-blue-900 transition-all shadow-sm active:scale-95"
-                        >
-                            {loading ? <Loader2 className="w-4 h-4 animate-spin text-blue-900" /> : <RefreshCw className="w-4 h-4" />}
-                        </button>
-                    </div>
+                    ))}
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto pb-4">
-                <table className="min-w-full border-separate border-spacing-y-3">
-                    <thead>
-                        <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            <th className="px-4 pb-2 text-left">Date & Time</th>
-                            <th className="px-4 pb-2 text-left">User</th>
-                            <th className="px-4 pb-2 text-left">Action</th>
-                            <th className="px-4 pb-2 text-left w-1/3">Description</th>
-                            <th className="px-4 pb-2 text-left">Metadata</th>
-                        </tr>
-                    </thead>
-                    <tbody className="relative">
-                        {loading && !isFirstLoad ? (
-                            [...Array(5)].map((_, i) => (
-                                <tr key={i}>
-                                    <td colSpan={5} className="px-4 py-2">
-                                        <div className="h-16 bg-white rounded-2xl border border-slate-200 animate-pulse" />
-                                    </td>
-                                </tr>
-                            ))
-                        ) : (
-                            <AnimatePresence mode="popLayout">
-                                {logs.map((log, i) => (
-                                    <motion.tr
-                                        key={log.id}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: i * 0.03 }}
-                                        className="group bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all duration-300"
-                                    >
-                                        <td className="p-4 rounded-l-2xl whitespace-nowrap">
-                                            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                                {new Date(log.created_at).toLocaleString()}
-                                            </div>
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
-                                                    {log.user?.name?.substring(0, 2).toUpperCase() || "SY"}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-slate-900">
-                                                        {log.user?.member?.full_name || log.user?.name || "System"}
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-500">
-                                                        {log.user?.member?.e_kanisa_number
-                                                            ? `#${log.user.member.e_kanisa_number}`
-                                                            : log.user?.email}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide rounded-md border ${getActionColor(log.action)}`}>
-                                                {log.action}
-                                            </span>
-                                        </td>
-                                        <td className="p-4">
-                                            <p className="text-sm text-slate-600 line-clamp-2" title={log.description}>
-                                                {log.description}
-                                            </p>
-                                        </td>
-                                        <td className="p-4 rounded-r-2xl">
-                                            <div className="flex flex-col gap-1 text-[10px] text-slate-400 font-mono">
-                                                <div className="flex items-center gap-1">
-                                                    <Monitor className="w-3 h-3" />
-                                                    {log.ip_address || "Unknown IP"}
-                                                </div>
-                                                <div className="truncate max-w-[100px]" title={log.user_agent}>
-                                                    {log.user_agent}
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </motion.tr>
-                                ))}
-                            </AnimatePresence>
-                        )}
-                    </tbody>
-                </table>
-                {!loading && logs.length === 0 && (
-                    <div className="text-center py-20 text-slate-500">No audit logs found.</div>
+            {/* Controls */}
+            <div className="flex gap-3 mb-6">
+                <div className="relative group flex-grow">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder={`Search ${activeTab}...`}
+                        className="pl-10 pr-4 py-2.5 w-full bg-white border border-slate-200 rounded-xl shadow-sm focus:ring-2 focus:ring-[#0A1F44]/10 focus:border-[#0A1F44] outline-none transition-all"
+                    />
+                </div>
+                <button onClick={fetchData} className="p-2.5 bg-white border border-slate-200 rounded-xl hover:text-[#0A1F44] hover:bg-slate-50 transition-colors shadow-sm active:scale-95">
+                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <RefreshCw className="w-5 h-5" />}
+                </button>
+            </div>
+
+            {/* Content List */}
+            <div className="space-y-4 max-w-5xl mx-auto pb-20">
+                <AnimatePresence mode="wait">
+                    {data.map((item, i) => (
+                        <motion.div
+                            key={item.id}
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            transition={{ delay: i * 0.03, duration: 0.2 }}
+                            className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-default"
+                        >
+                            {activeTab === 'logs' && renderLogs(item)}
+                            {activeTab === 'communications' && renderComm(item)}
+                            {activeTab === 'tasks' && renderTask(item)}
+                            {activeTab === 'attendances' && renderAttendance(item)}
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
+
+                {!loading && data.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
+                        <div className="p-4 bg-slate-50 rounded-full mb-4 opacity-50"><Activity className="w-8 h-8 text-slate-400" /></div>
+                        <p className="text-slate-500 font-medium">No records found for {activeTab}</p>
+                    </div>
                 )}
-            </div>
 
-            {/* Pagination */}
-            <div className="flex justify-between items-center mt-4">
-                <div className="text-sm text-slate-500">Total: {total}</div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page <= 1}
-                        className="p-2 rounded bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                        <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="px-3 py-2 text-sm font-bold bg-white border border-slate-300 rounded">{page}</span>
-                    <button
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page >= totalPages}
-                        className="p-2 rounded bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                        <ChevronRight className="w-4 h-4" />
-                    </button>
-                </div>
+                {/* Pagination */}
+                {total > 0 && (
+                    <div className="flex justify-center mt-8">
+                        <div className="flex bg-white rounded-xl shadow-sm border border-slate-200 p-1 gap-1">
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page <= 1}
+                                className="p-2 rounded-lg hover:bg-slate-50 disabled:opacity-30 text-slate-500 transition-colors"
+                            >
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <div className="flex items-center px-4 font-bold text-sm text-[#0A1F44]">
+                                Page {page} of {totalPages}
+                            </div>
+                            <button
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page >= totalPages}
+                                className="p-2 rounded-lg hover:bg-slate-50 disabled:opacity-30 text-slate-500 transition-colors"
+                            >
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
