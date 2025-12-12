@@ -700,6 +700,85 @@ class MemberController extends Controller
         ]);
     }
 
+    /**
+     * Get Member Digital File (Aggregated Data)
+     */
+    public function getDigitalFile(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user) {
+             return response()->json(['status' => 401, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = Member::with(['dependencies', 'groups'])->find($id);
+
+        if (!$member) {
+            return response()->json(['status' => 404, 'message' => 'Member not found'], 404);
+        }
+
+        // 1. Attendance (General System)
+        $attendances = DB::table('attendances')
+            ->where('member_id', $member->id)
+            ->orderBy('event_date', 'desc')
+            ->get();
+
+        // 2. Minute Attendance (Official Meetings)
+        $meetingAttendance = DB::table('minute_attendees')
+            ->join('minutes', 'minute_attendees.minute_id', '=', 'minutes.id')
+            ->where('minute_attendees.member_id', $member->id)
+            ->select('minutes.title', 'minutes.meeting_date', 'minutes.meeting_type', 'minute_attendees.status')
+            ->orderBy('minutes.meeting_date', 'desc')
+            ->get();
+
+        // 3. Contributions
+        $contributions = DB::table('contributions')
+            ->where('member_id', $member->id)
+            ->orderBy('contribution_date', 'desc')
+            ->get();
+
+        // 4. Action Items (Tasks)
+        $tasks = DB::table('minute_action_items')
+            ->join('minutes', 'minute_action_items.minute_id', '=', 'minutes.id')
+            ->where('minute_action_items.responsible_member_id', $member->id)
+            ->select('minute_action_items.*', 'minutes.title as meeting_title', 'minutes.meeting_date')
+            ->orderBy('minutes.meeting_date', 'desc')
+            ->get();
+            
+        // 5. Audit Logs
+        $auditLogs = [];
+        $linkedUser = User::where('email', $member->email)->first();
+        if ($linkedUser) {
+            $auditLogs = DB::table('audit_logs')
+                ->where('user_id', $linkedUser->id)
+                ->orderBy('created_at', 'desc')
+                ->limit(50)
+                ->get();
+        }
+
+        // Format Photos for Dependents
+        $memberArray = $member->toArray();
+        if (!empty($member->profile_image)) {
+            $memberArray['profile_image_url'] = asset('storage/'.$member->profile_image);
+        }
+        $memberArray['dependencies'] = collect($memberArray['dependencies'])->map(function($dep) {
+             if (!empty($dep['photos'])) {
+                $dep['photo_urls'] = array_map(function($p) { return asset('storage/'.$p); }, $dep['photos']);
+             }
+             return $dep;
+        });
+
+        return response()->json([
+            'status' => 200,
+            'data' => [
+                'profile' => $memberArray,
+                'attendances' => $attendances,
+                'meeting_attendance' => $meetingAttendance,
+                'contributions' => $contributions,
+                'tasks' => $tasks,
+                'audit_logs' => $auditLogs,
+            ]
+        ]);
+    }
 }
 
 

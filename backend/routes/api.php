@@ -286,6 +286,7 @@ Route::middleware(['auth:sanctum', 'role:elder|secretary'])->group(function(){
         Route::get('/members', [\App\Http\Controllers\Elder\MembersController::class, 'index']);
         Route::post('/members', [\App\Http\Controllers\Elder\MembersController::class, 'store']);
         Route::get('/members/{member}', [\App\Http\Controllers\Elder\MembersController::class, 'show']);
+        Route::get('/members/{member}/digital-file', [\App\Http\Controllers\MemberController::class, 'getDigitalFile']);
         Route::put('/members/{member}', [\App\Http\Controllers\Elder\MembersController::class, 'update']);
         Route::delete('/members/{member}', [\App\Http\Controllers\Elder\MembersController::class, 'destroy']);
         

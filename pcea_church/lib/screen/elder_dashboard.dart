@@ -4,6 +4,7 @@ import 'package:pcea_church/screen/members.dart';
 import 'package:pcea_church/screen/elder_message_form.dart';
 import 'package:pcea_church/screen/church_contribution.dart';
 import 'package:pcea_church/screen/elder_events_list.dart';
+import 'package:pcea_church/screen/digital_storage.dart';
 
 class ElderDashboard extends BaseDashboard {
   const ElderDashboard({super.key});
@@ -54,6 +55,20 @@ class ElderDashboard extends BaseDashboard {
             context,
             MaterialPageRoute(
               builder: (context) => const ElderEventsListScreen(),
+            ),
+          );
+        },
+      ),
+      DashboardCard(
+        icon: Icons.folder_shared_rounded,
+        title: 'Member Digital File',
+        color: Colors.teal,
+        subtitle: 'View digital footprints',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MemberDigitalFileScreen(),
             ),
           );
         },
@@ -131,7 +146,6 @@ class ElderMemberViewScreen extends StatelessWidget {
     );
   }
 }
-
 
 class ChurchBoardScreen extends StatelessWidget {
   const ChurchBoardScreen({super.key});
