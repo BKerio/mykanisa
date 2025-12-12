@@ -9,12 +9,9 @@ import {
     Loader2,
     Calendar,
     Monitor,
-    Download,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLoader from "@/lib/loader";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 // --- Types ---
 type TabType = 'logs' | 'communications' | 'tasks' | 'attendances';

@@ -7,5 +7,5 @@ return [
     'tillno'         => env('TILL_NO'),
     'passkey'        => env('MPESA_PASSKEY'),
     'callback_url'   => env('MPESA_CALLBACK_URL'),
-    'env'            => env('MPESA_ENV', 'sandbox'), // 'sandbox' or 'live'
+    'env'            => env('MPESA_ENV', 'live'), // 'sandbox' or 'live'
 ];

@@ -16,9 +16,9 @@ class MpesaService
 
     public function __construct()
     {
-        $this->baseUrl = config('mpesa.env') === 'sandbox'
-            ? 'https://sandbox.safaricom.co.ke'
-            : 'https://api.safaricom.co.ke';
+        $this->baseUrl = config('mpesa.env') === 'live'
+            ? 'https://api.safaricom.co.ke'
+            : 'https://sandbox.safaricom.co.ke';
 
         $this->consumerKey    = config('mpesa.consumer_key');
         $this->consumerSecret = config('mpesa.consumer_secret');
@@ -51,8 +51,8 @@ class MpesaService
             "BusinessShortCode" => $this->shortcode,      // Paybill used in password
             "Password"          => $password,
             "Timestamp"         => $timestamp,
-            //"TransactionType"   => "CustomerBuyGoodsOnline",//For Till payments
-            "TransactionType"   => "CustomerPayBillOnline",//For Paybill payments(sandbox)
+            "TransactionType"   => "CustomerBuyGoodsOnline",//For Till payments
+            //"TransactionType"   => "CustomerPayBillOnline",//For Paybill payments(sandbox)
             "Amount"            => $amount,
             "PartyA"            => $phone,//m-pesa number
             "PartyB"            => $this->tillno,//Till Number

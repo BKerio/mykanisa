@@ -357,7 +357,7 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
                       : null,
                   onTap: () {
                     setState(() {
-                      _selectedStatus = status['value'] as String?;
+                      _selectedStatus = status['value'];
                     });
                     _currentPage = 1;
                     Navigator.pop(context);
