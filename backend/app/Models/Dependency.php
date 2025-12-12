@@ -18,11 +18,13 @@ class Dependency extends Model
         'takes_holy_communion',
         'school',
         'image',
+        'photos',
     ];
 
     protected $casts = [
         'is_baptized' => 'boolean',
         'takes_holy_communion' => 'boolean',
+        'photos' => 'array',
     ];
 
     public function member()

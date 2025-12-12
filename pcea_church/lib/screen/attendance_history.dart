@@ -241,6 +241,67 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
     }
   }
 
+  void _showEventTypePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Select Event Type',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ..._eventTypes.map((type) {
+                final isSelected = (_selectedEventType ?? "All") == type;
+                return ListTile(
+                  leading: Icon(
+                    type == "All" ? Icons.calendar_view_month : Icons.event,
+                    color: isSelected ? const Color(0xFF0A1F44) : Colors.grey,
+                  ),
+                  title: Text(
+                    type == "All" ? "All Event Types" : type,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? const Color(0xFF0A1F44) : Colors.black,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? const Icon(Icons.check_circle, color: Color(0xFF0A1F44))
+                      : null,
+                  onTap: () {
+                    setState(() {
+                       _selectedEventType = type;
+                       _isLoading = true;
+                    });
+                    Navigator.pop(context);
+                    _fetchAttendanceHistory();
+                  },
+                );
+              }).toList(),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -318,38 +379,65 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                         ],
                     ),
                     const SizedBox(height: 12),
-                    // Event Type Dropdown
+                    
+                    // NEW Event Type Picker (Matching Group Leader Dashboard Style)
                     Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(8),
-                            color: Colors.white,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14), // Matches reference
+                        boxShadow: [
+                           // Optional subtle shadow if desired, reference had it on parent container
+                        ],
+                      ),
+                      child: GestureDetector(
+                        onTap: () => _showEventTypePicker(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.grey.shade300, width: 1.2),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.event_note, color: Color(0xFF0A1F44)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Event Type',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      (_selectedEventType == null || _selectedEventType == "All") 
+                                          ? 'All Event Types' 
+                                          : _selectedEventType!,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.keyboard_arrow_down_rounded),
+                            ],
+                          ),
                         ),
-                        child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                                isExpanded: true,
-                                value: _selectedEventType ?? "All",
-                                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0A1F44)),
-                                elevation: 2,
-                                style: const TextStyle(color: Color(0xFF0A1F44), fontSize: 15),
-                                onChanged: (String? newValue) {
-                                    if (newValue != null) {
-                                        setState(() {
-                                            _selectedEventType = newValue;
-                                            _isLoading = true;
-                                        });
-                                        _fetchAttendanceHistory();
-                                    }
-                                },
-                                items: _eventTypes.map<DropdownMenuItem<String>>((String value) {
-                                    return DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(value == "All" ? "All Event Types" : value),
-                                    );
-                                }).toList(),
-                            ),
-                        ),
+                      ),
                     ),
                 ],
               ),

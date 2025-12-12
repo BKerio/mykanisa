@@ -189,11 +189,196 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
     }
   }
 
+  void _showCongregationPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Select Congregation',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    ListTile(
+                      leading: Icon(
+                        Icons.church,
+                        color: _selectedCongregation == null
+                            ? const Color(0xFF0A1F44)
+                            : Colors.grey,
+                      ),
+                      title: Text(
+                        'All Congregations',
+                        style: TextStyle(
+                          fontWeight: _selectedCongregation == null
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: _selectedCongregation == null
+                              ? const Color(0xFF0A1F44)
+                              : Colors.black,
+                        ),
+                      ),
+                      trailing: _selectedCongregation == null
+                          ? const Icon(
+                              Icons.check_circle,
+                              color: Color(0xFF0A1F44),
+                            )
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          _selectedCongregation = null;
+                        });
+                        _currentPage = 1;
+                        Navigator.pop(context);
+                        _loadContributions();
+                      },
+                    ),
+                    ..._congregations.map((cong) {
+                      final isSelected = _selectedCongregation == cong;
+                      return ListTile(
+                        leading: Icon(
+                          Icons.location_city,
+                          color: isSelected
+                              ? const Color(0xFF0A1F44)
+                              : Colors.grey,
+                        ),
+                        title: Text(
+                          cong,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? const Color(0xFF0A1F44)
+                                : Colors.black,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(
+                                Icons.check_circle,
+                                color: Color(0xFF0A1F44),
+                              )
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedCongregation = cong;
+                          });
+                          _currentPage = 1;
+                          Navigator.pop(context);
+                          _loadContributions();
+                        },
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showStatusPicker() {
+    final statuses = [
+      {'label': 'All Status', 'value': null},
+      {'label': 'Confirmed', 'value': 'confirmed'},
+      {'label': 'Pending', 'value': 'pending'},
+      {'label': 'Failed', 'value': 'failed'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Select Status',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ...statuses.map((status) {
+                final isSelected = _selectedStatus == status['value'];
+                return ListTile(
+                  leading: Icon(
+                    Icons.info_outline,
+                    color: isSelected ? const Color(0xFF0A1F44) : Colors.grey,
+                  ),
+                  title: Text(
+                    status['label'] as String,
+                    style: TextStyle(
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: isSelected
+                          ? const Color(0xFF0A1F44)
+                          : Colors.black,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? const Icon(Icons.check_circle, color: Color(0xFF0A1F44))
+                      : null,
+                  onTap: () {
+                    setState(() {
+                      _selectedStatus = status['value'] as String?;
+                    });
+                    _currentPage = 1;
+                    Navigator.pop(context);
+                    _loadContributions();
+                  },
+                );
+              }).toList(),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF0A1F44),
+        foregroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         title: Text(
@@ -261,83 +446,105 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
                   children: [
                     // Congregation Filter
                     Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedCongregation,
-                        decoration: InputDecoration(
-                          labelText: 'Congregation',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
+                      child: GestureDetector(
+                        onTap: _showCongregationPicker,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
                             horizontal: 12,
-                            vertical: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.grey,
+                            ), // Standard grey border
+                          ),
+                          child: Row(
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Congregation',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 10, // Small label
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _selectedCongregation ??
+                                        'All Congregations',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black87,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              const Icon(
+                                Icons.arrow_drop_down,
+                                color: Colors.grey,
+                              ),
+                            ],
                           ),
                         ),
-                        items: [
-                          const DropdownMenuItem<String>(
-                            value: null,
-                            child: Text('All Congregations'),
-                          ),
-                          ..._congregations.map(
-                            (cong) => DropdownMenuItem<String>(
-                              value: cong,
-                              child: Text(cong),
-                            ),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedCongregation = value;
-                          });
-                          _currentPage = 1;
-                          _loadContributions();
-                        },
                       ),
                     ),
                     const SizedBox(width: 12),
                     // Status Filter
                     Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedStatus,
-                        decoration: InputDecoration(
-                          labelText: 'Status',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
+                      child: GestureDetector(
+                        onTap: _showStatusPicker,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
                             horizontal: 12,
-                            vertical: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey),
+                          ),
+                          child: Row(
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Status',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _selectedStatus == null
+                                        ? 'All Status'
+                                        : _selectedStatus![0].toUpperCase() +
+                                              _selectedStatus!.substring(1),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black87,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              const Icon(
+                                Icons.arrow_drop_down,
+                                color: Colors.grey,
+                              ),
+                            ],
                           ),
                         ),
-                        items: const [
-                          DropdownMenuItem<String>(
-                            value: null,
-                            child: Text('All Status'),
-                          ),
-                          DropdownMenuItem<String>(
-                            value: 'confirmed',
-                            child: Text('Confirmed'),
-                          ),
-                          DropdownMenuItem<String>(
-                            value: 'pending',
-                            child: Text('Pending'),
-                          ),
-                          DropdownMenuItem<String>(
-                            value: 'failed',
-                            child: Text('Failed'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedStatus = value;
-                          });
-                          _currentPage = 1;
-                          _loadContributions();
-                        },
                       ),
                     ),
                   ],
@@ -447,7 +654,7 @@ class _ElderContributionsScreenState extends State<ElderContributionsScreen> {
                         margin: const EdgeInsets.all(16),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32),
+                          color: const Color(0xFF0A1F44),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(

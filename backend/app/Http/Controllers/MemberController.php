@@ -489,6 +489,11 @@ class MemberController extends Controller
                 if (!empty($dep->image)) {
                     $arr['image_url'] = asset('storage/'.$dep->image);
                 }
+                if (!empty($dep->photos)) {
+                    $arr['photo_urls'] = array_map(function($photo) {
+                        return asset('storage/'.$photo);
+                    }, $dep->photos);
+                }
                 return $arr;
             });
 
@@ -507,6 +512,7 @@ class MemberController extends Controller
             'is_baptized' => 'boolean',
             'takes_holy_communion' => 'boolean',
             'school' => 'nullable|string|max:255',
+            'photos.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $user = $request->user();
@@ -519,7 +525,7 @@ class MemberController extends Controller
         // Check for duplicate dependents globally (across all members)
         $duplicateCheck = Dependency::where('name', $validated['name'])
             ->where('year_of_birth', $validated['year_of_birth'])
-            ->when($validated['birth_cert_number'], function($query, $certNumber) {
+            ->when(($validated['birth_cert_number'] ?? null), function($query, $certNumber) {
                 return $query->where('birth_cert_number', $certNumber);
             })
             ->first();
@@ -528,9 +534,21 @@ class MemberController extends Controller
             return response()->json([
                 'status' => 409,
                 'message' => 'A dependent with this name, birth year' . 
-                           ($validated['birth_cert_number'] ? ', and birth certificate number' : '') . 
+                           (($validated['birth_cert_number'] ?? null) ? ', and birth certificate number' : '') . 
                            ' already exists in the system.'
             ], 409);
+        }
+
+        $photoPaths = [];
+        if ($request->hasFile('photos')) {
+            $files = $request->file('photos');
+            // Ensure we only take up to 3 photos
+            $files = array_slice($files, 0, 3);
+            
+            foreach ($files as $file) {
+                $path = $file->store('dependents', 'public');
+                $photoPaths[] = $path;
+            }
         }
 
         // Create new dependent
@@ -538,10 +556,11 @@ class MemberController extends Controller
             'member_id' => $member->id,
             'name' => $validated['name'],
             'year_of_birth' => $validated['year_of_birth'],
-            'birth_cert_number' => $validated['birth_cert_number'],
-            'is_baptized' => $validated['is_baptized'] ?? false,
-            'takes_holy_communion' => $validated['takes_holy_communion'] ?? false,
-            'school' => $validated['school'],
+            'birth_cert_number' => $validated['birth_cert_number'] ?? null,
+            'is_baptized' => filter_var($request->input('is_baptized'), FILTER_VALIDATE_BOOLEAN),
+            'takes_holy_communion' => filter_var($request->input('takes_holy_communion'), FILTER_VALIDATE_BOOLEAN),
+            'school' => $validated['school'] ?? null,
+            'photos' => $photoPaths,
         ]);
 
         $dependent->save();
@@ -562,6 +581,8 @@ class MemberController extends Controller
             'is_baptized' => 'boolean',
             'takes_holy_communion' => 'boolean',
             'school' => 'nullable|string|max:255',
+            'photos.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+            'kept_photos' => 'nullable|string', // JSON string of photo paths to keep
         ]);
 
         $user = $request->user();
@@ -582,7 +603,7 @@ class MemberController extends Controller
         // Check for duplicate dependents globally (excluding current one)
         $duplicateCheck = Dependency::where('name', $validated['name'])
             ->where('year_of_birth', $validated['year_of_birth'])
-            ->when($validated['birth_cert_number'], function($query, $certNumber) {
+            ->when(($validated['birth_cert_number'] ?? null), function($query, $certNumber) {
                 return $query->where('birth_cert_number', $certNumber);
             })
             ->where('id', '!=', $id)
@@ -592,19 +613,65 @@ class MemberController extends Controller
             return response()->json([
                 'status' => 409,
                 'message' => 'A dependent with this name, birth year' . 
-                           ($validated['birth_cert_number'] ? ', and birth certificate number' : '') . 
+                           (($validated['birth_cert_number'] ?? null) ? ', and birth certificate number' : '') . 
                            ' already exists in the system.'
             ], 409);
+        }
+
+        // Process Photos
+        // 1. Get currently stored photos
+        $currentPhotos = $dependent->photos ?? [];
+        
+        // 2. Determine which old photos to keep
+        $keptPhotos = [];
+        if ($request->has('kept_photos')) {
+             $keptInput = $request->input('kept_photos');
+             // Handle if it comes as JSON string or array (standardizing)
+             $keptList = is_string($keptInput) ? json_decode($keptInput, true) : $keptInput;
+             $keptList = is_array($keptList) ? $keptList : [];
+             
+             // Verify these photos actually belong to the dependent
+             foreach ($keptList as $path) {
+                 if (in_array($path, $currentPhotos)) {
+                     $keptPhotos[] = $path;
+                 }
+             }
+        }
+        
+        // 3. Delete photos that were removed (in current but not in kept)
+        foreach ($currentPhotos as $path) {
+            if (!in_array($path, $keptPhotos)) {
+                if (Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+        }
+
+        // 4. Add new photos
+        $finalPhotos = $keptPhotos;
+        if ($request->hasFile('photos')) {
+            $files = $request->file('photos');
+            // Calculate how many more we can add
+            $remainingSlots = 3 - count($finalPhotos);
+            
+            if ($remainingSlots > 0) {
+                $filesToAdd = array_slice($files, 0, $remainingSlots);
+                foreach ($filesToAdd as $file) {
+                    $path = $file->store('dependents', 'public');
+                    $finalPhotos[] = $path;
+                }
+            }
         }
 
         // Update dependent
         $dependent->update([
             'name' => $validated['name'],
             'year_of_birth' => $validated['year_of_birth'],
-            'birth_cert_number' => $validated['birth_cert_number'],
-            'is_baptized' => $validated['is_baptized'] ?? false,
-            'takes_holy_communion' => $validated['takes_holy_communion'] ?? false,
-            'school' => $validated['school'],
+            'birth_cert_number' => $validated['birth_cert_number'] ?? null,
+            'is_baptized' => filter_var($request->input('is_baptized'), FILTER_VALIDATE_BOOLEAN),
+            'takes_holy_communion' => filter_var($request->input('takes_holy_communion'), FILTER_VALIDATE_BOOLEAN),
+            'school' => $validated['school'] ?? null,
+            'photos' => $finalPhotos,
         ]);
 
         return response()->json([

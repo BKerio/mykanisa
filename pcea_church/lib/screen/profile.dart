@@ -177,11 +177,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _initializeProfile();
   }
-  
+
   Future<void> _initializeProfile() async {
     await fetchProfile();
     loadGroups();
-    
+
     // Auto-open edit dialog if requested, after profile is loaded
     if (widget.autoOpenPage != null && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -695,12 +695,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 241, 242, 243),
+        backgroundColor: Color(0xFF0A1F44),
+        foregroundColor: const Color.fromARGB(255, 241, 242, 243),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'My Profile',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          'Member Profile',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
       body: loading
@@ -969,7 +970,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 child: Center(
                                   child: SpinKitFadingCircle(
                                     size: 64,
-                                    duration: const Duration(milliseconds: 3200),
+                                    duration: const Duration(
+                                      milliseconds: 3200,
+                                    ),
                                     itemBuilder: (context, index) {
                                       final palette = [
                                         Colors.black,
@@ -979,7 +982,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ];
                                       return DecoratedBox(
                                         decoration: BoxDecoration(
-                                          color: palette[index % palette.length],
+                                          color:
+                                              palette[index % palette.length],
                                           shape: BoxShape.circle,
                                         ),
                                       );
@@ -992,7 +996,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF0A1F44).withOpacity(0.3),
+                                      color: const Color(
+                                        0xFF0A1F44,
+                                      ).withOpacity(0.3),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1003,7 +1009,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF0A1F44),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
